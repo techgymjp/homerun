@@ -330,6 +330,39 @@ const sfx = {
     tone({ dur: 0.6, f: 90, f2: 35, g: 0.5 });
     for (let i = 0; i < 18; i++) noiseShot({ t: rand(0.25, 1.3), dur: 0.03, type: 'highpass', f: 5000, g: rand(0.05, 0.15) });
   },
+  // 観客のため息「あー…」：ピッチの違う声を何人分も重ね、母音「あ」のフォルマントを通して下降させる
+  sigh(level = 1) {
+    if (!AC) return;
+    const t0 = AC.currentTime + 0.05, dur = 1.5;
+    const out = AC.createGain(); out.gain.value = 0.55 * level;
+    for (const [f, q, g] of [[800, 6, 1], [1200, 7, 0.55], [2600, 8, 0.18]]) {
+      const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+      const fg = AC.createGain(); fg.gain.value = g;
+      out.connect(bp).connect(fg).connect(master);
+    }
+    for (let i = 0; i < 14; i++) {
+      const f0 = rand(110, 280), st = t0 + rand(0, 0.12), d = dur * rand(0.8, 1.1);
+      const o = AC.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0 * 1.08, st);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.72, st + d);
+      const vib = AC.createOscillator(); vib.frequency.value = rand(4, 6.5);
+      const vg = AC.createGain(); vg.gain.value = f0 * 0.015;
+      vib.connect(vg).connect(o.frequency);
+      const g = AC.createGain();
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.06, st + 0.12);
+      g.gain.setTargetAtTime(0.045, st + 0.2, 0.3);
+      g.gain.setTargetAtTime(0.0001, st + d * 0.6, d * 0.2);
+      o.connect(g).connect(out);
+      o.start(st); vib.start(st); o.stop(st + d + 0.6); vib.stop(st + d + 0.6);
+    }
+    // 息の成分
+    const n = AC.createBufferSource(); n.buffer = noiseBuf;
+    const ng = AC.createGain();
+    ng.gain.setValueAtTime(0.0001, t0); ng.gain.exponentialRampToValueAtTime(0.25, t0 + 0.15);
+    ng.gain.setTargetAtTime(0.0001, t0 + dur * 0.5, dur * 0.25);
+    n.connect(ng).connect(out); n.start(t0, Math.random()); n.stop(t0 + dur + 0.6);
+  },
   launch() { tone({ dur: 0.7, f: 500, f2: 1600, type: 'sine', g: 0.04 }); noiseShot({ dur: 0.6, type: 'highpass', f: 3000, g: 0.06, attack: 0.1 }); },
 };
 
@@ -536,7 +569,8 @@ function hitBall(nt, ns, ex, ey, dt) {
   const power = clamp(1.2 - e, 0.2, 1);
   if (kind === 'foul') sfx.foul(); else sfx.crack(power);
   if (kind === 'hit') { stats.hit++; }
-  if (kind === 'hit' || (kind === 'out' && label === '惜しい！')) sfx.cheer(kind === 'hit' ? 0.5 : 0.35, 1.4);
+  if (kind === 'hit') sfx.cheer(0.5, 1.4);
+  else if (label === '惜しい！') sfx.sigh(1);
   flashT = now;
   swing.hit = true;
   marks = { target: { ...pitch.target }, tap: { sx: swing.sx, sy: swing.sy } };
@@ -562,6 +596,7 @@ function finishPitchNoHit() {
   marks = { target: { ...pitch.target }, tap: swing ? { sx: swing.sx, sy: swing.sy } : null };
   if (swing) {
     let t = '空振り';
+    sfx.sigh(1);
     const sub = swing.reason || '';
     msg = { text: t, sub, color: '#ff6b6b', t: now };
   } else {
