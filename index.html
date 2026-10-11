@@ -25,10 +25,10 @@
   #board .spd { font-size: 22px; color: #7fe3ff; font-variant-numeric: tabular-nums; }
   .hidden { display: none !important; }
   .overlay {
-    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px;
+    position: fixed; inset: 0; display: flex; padding: 16px; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
     background: radial-gradient(ellipse at center, rgba(10,20,50,.82), rgba(2,5,15,.94));
   }
-  .panel { width: min(460px, 100%); text-align: center; }
+  .panel { width: min(460px, 100%); text-align: center; margin: auto; }
   .panel h1 { margin: 0 0 4px; font-size: clamp(28px, 8vw, 44px); letter-spacing: .02em; line-height: 1.15;
     background: linear-gradient(#fff6c4, #ffc928 60%, #ff8a00); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 3px 0 rgba(0,0,0,.5)); }
@@ -47,6 +47,11 @@
   .stat { background: rgba(255,255,255,.07); border-radius: 12px; padding: 10px; }
   .stat b { display: block; font-size: 28px; color: #ffd84a; }
   .stat span { font-size: 12px; color: #b9c6e8; }
+  .calib { background: rgba(255,255,255,.07); border-radius: 12px; padding: 10px; margin: 10px 0; font-size: 14px; }
+  .calib b { color: #7fe3ff; font-size: 18px; }
+  .calib .row { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0; }
+  .calib small { display: block; color: #b9c6e8; font-size: 11px; }
+  .sbtn { font: inherit; font-weight: 800; font-size: 15px; padding: 6px 14px; border-radius: 10px; border: 0; background: #dfe7f7; color: #1b2440; }
   .rank { font-size: 26px; font-weight: 900; color: #ff9d3c; margin: 6px 0; }
 </style>
 </head>
@@ -72,6 +77,15 @@
     <button class="btn" data-level="legend">体感160km/h<small>実速。最速163km/h・判定シビア（推奨）</small></button>
     <button class="btn alt" data-level="pro">プロ<small>少し遅め・判定やや甘め</small></button>
     <button class="btn alt" data-level="rookie">ルーキー<small>練習用。かなり遅め</small></button>
+    <div class="calib">
+      <div>タイミング補正 <b id="latV">+0ms</b></div>
+      <div class="row">
+        <button id="latMinus" class="sbtn">−10</button>
+        <label><input type="checkbox" id="latAuto" checked> 自動調整</label>
+        <button id="latPlus" class="sbtn">＋10</button>
+      </div>
+      <small>スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ</small>
+    </div>
     <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px">📳 振動テスト<small id="vibResult">スマホが振動するか確認できます</small></button>
   </div>
 </div>
@@ -109,9 +123,9 @@ const MOUND_Z = 18.44;
 const DRAG = 0.0045;
 
 const LEVELS = {
-  legend: { name: '体感160km/h', speedMul: 1.00, wt: 60,  ws: 0.12 },
-  pro:    { name: 'プロ',         speedMul: 0.86, wt: 80,  ws: 0.15 },
-  rookie: { name: 'ルーキー',     speedMul: 0.68, wt: 110, ws: 0.19 },
+  legend: { name: '体感160km/h', speedMul: 1.00, wt: 75,  ws: 0.14 },
+  pro:    { name: 'プロ',         speedMul: 0.86, wt: 95,  ws: 0.17 },
+  rookie: { name: 'ルーキー',     speedMul: 0.68, wt: 130, ws: 0.22 },
 };
 
 // 球種：加速度(m/s^2)・速度域(km/h)・変化の鋭さ（指数が大きいほど打者の手元で曲がる）
@@ -520,6 +534,38 @@ function flushHaptic() {
 for (const ev of ['pointerup', 'touchend']) cv.addEventListener(ev, flushHaptic);
 
 // ============================================================
+//  タイミング補正（端末の表示遅延・タッチ遅延の吸収）
+//  直近のスイングの「生のズレ」の中央値を遅延とみなして判定から差し引く
+// ============================================================
+const calib = { ms: 0, auto: true, samples: [] };
+try {
+  const saved = JSON.parse(localStorage.getItem('homerun.calib') || 'null');
+  if (saved) { calib.ms = saved.ms || 0; calib.auto = saved.auto !== false; }
+} catch (e) {}
+function saveCalib() {
+  try { localStorage.setItem('homerun.calib', JSON.stringify({ ms: calib.ms, auto: calib.auto })); } catch (e) {}
+  const v = document.getElementById('latV');
+  if (v) v.textContent = (calib.ms >= 0 ? '+' : '') + calib.ms + 'ms';
+  const a = document.getElementById('latAuto');
+  if (a) a.checked = calib.auto;
+}
+function learnLatency(rawDt) {
+  if (!calib.auto || Math.abs(rawDt) > 250) return;   // 明らかなタイミング外れは学習しない
+  calib.samples.push(rawDt);
+  if (calib.samples.length > 9) calib.samples.shift();
+  if (calib.samples.length < 3) return;
+  const sorted = [...calib.samples].sort((a, b) => a - b);
+  const med = sorted[sorted.length >> 1];
+  calib.ms = Math.round(clamp(lerp(calib.ms, med, 0.5), 0, 200) / 5) * 5;
+  saveCalib();
+}
+function nudgeCalib(d) {
+  calib.ms = clamp(calib.ms + d, 0, 200);
+  calib.auto = false; calib.samples = [];
+  saveCalib();
+}
+
+// ============================================================
 //  ゲーム状態
 // ============================================================
 let level = LEVELS.legend, levelKey = 'legend';
@@ -627,7 +673,7 @@ cv.addEventListener('pointerdown', e => {
   const t = (e.timeStamp && Math.abs(e.timeStamp - performance.now()) < 200) ? e.timeStamp : performance.now();
   onTap(e.clientX, e.clientY, t);
 }, { passive: false });
-document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('touchmove', e => { if (!e.target.closest('.overlay')) e.preventDefault(); }, { passive: false });
 document.addEventListener('gesturestart', e => e.preventDefault());
 
 function onTap(sx, sy, t) {
@@ -652,7 +698,9 @@ function doSwing(sx, sy, t) {
     swing.miss = true; swing.reason = 'まだ投げてない！';
     return;
   }
-  const dt = t - pitch.tArr;                       // +:遅い  -:早い
+  const rawDt = t - pitch.tArr;
+  learnLatency(rawDt);
+  const dt = rawDt - calib.ms;                     // +:遅い  -:早い（端末の遅延を補正済み）
   const tap = plateFromScreen(sx, sy);
   const ex = tap.x - pitch.target.x, ey = tap.y - pitch.target.y;
   const nt = dt / level.wt, ns = Math.hypot(ex, ey) / level.ws;
@@ -673,7 +721,7 @@ function doSwing(sx, sy, t) {
 function hitBall(nt, ns, ex, ey, dt) {
   sfx.stopWhoosh();
   const e = Math.min(1.6, Math.hypot(nt, ns));
-  let ev = 184 * (1 - 0.45 * Math.pow(e, 1.5)) + (pitch.kmh - 140) * 0.08 + rand(-3, 3);
+  let ev = 188 * (1 - 0.40 * Math.pow(e, 1.5)) + (pitch.kmh - 140) * 0.08 + rand(-3, 3);
   ev = Math.max(60, ev);
   const theta = (25 - (ey / level.ws) * 40 + rand(-3, 3)) * DEG;
   const phi = ((dt / level.wt) * 38 + (ex / level.ws) * 6 + rand(-3, 3)) * DEG;
@@ -1408,6 +1456,10 @@ function render(time) {
 // ============================================================
 document.querySelectorAll('[data-level]').forEach(btn => btn.addEventListener('click', () => { initAudio(); startGame(btn.dataset.level); }));
 document.getElementById('vibTest').addEventListener('click', vibrateTest);
+document.getElementById('latMinus').addEventListener('click', () => nudgeCalib(-10));
+document.getElementById('latPlus').addEventListener('click', () => nudgeCalib(10));
+document.getElementById('latAuto').addEventListener('change', e => { calib.auto = e.target.checked; calib.samples = []; saveCalib(); });
+saveCalib();
 document.getElementById('again').addEventListener('click', () => { initAudio(); startGame(levelKey); });
 document.getElementById('toTitle').addEventListener('click', () => {
   document.getElementById('end').classList.add('hidden');
