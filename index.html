@@ -72,6 +72,7 @@
     <button class="btn" data-level="legend">体感160km/h<small>実速。最速163km/h・判定シビア（推奨）</small></button>
     <button class="btn alt" data-level="pro">プロ<small>少し遅め・判定やや甘め</small></button>
     <button class="btn alt" data-level="rookie">ルーキー<small>練習用。かなり遅め</small></button>
+    <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px">📳 振動テスト<small id="vibResult">スマホが振動するか確認できます</small></button>
   </div>
 </div>
 
@@ -491,6 +492,17 @@ const hapticSwitch = (() => {
   document.body.appendChild(label);
   return label;
 })();
+function vibrateTest() {
+  const out = document.getElementById('vibResult');
+  if (!navigator.vibrate) { hapticSwitch.click(); out.textContent = 'このブラウザは振動APIに非対応（iPhoneは iOS 18 以降のみ軽い触覚で代用）'; return; }
+  let ok = false;
+  try { ok = navigator.vibrate([200, 100, 200]); } catch (e) {}
+  const framed = window.self !== window.top;
+  out.textContent = ok
+    ? '振動命令は成功。震えない場合は端末の「バイブレーションと触覚フィードバック」設定を確認してください'
+    : (framed ? 'ブラウザにブロックされました（アプリ内のプレビュー表示では振動できません。Chrome で直接開いてください）'
+              : 'ブラウザにブロックされました（Chrome で直接開いているか確認してください）');
+}
 function haptic(pattern) {
   try { if (navigator.vibrate) { navigator.vibrate(pattern); return; } } catch (e) {}
   try { hapticSwitch.click(); } catch (e) {}
@@ -701,7 +713,7 @@ function hitBall(nt, ns, ex, ey, dt) {
   if (Math.abs(dt) <= 15 && ns < 0.35) stats.just++;
   const power = clamp(1.2 - e, 0.2, 1);
   if (kind === 'foul') sfx.foul(); else sfx.crack(power);
-  haptic(kind === 'foul' ? 15 : Math.round(20 + power * 25));   // 芯で捉えるほど長く
+  haptic(kind === 'foul' ? 40 : Math.round(50 + power * 50));   // 芯で捉えるほど長く（短すぎると端末によっては感じない）
   if (kind === 'hit') { stats.hit++; }
   if (kind === 'hit') sfx.cheer(0.5, 1.4);
   else if (label === '惜しい！') sfx.sigh(1);
@@ -1372,6 +1384,7 @@ function render(time) {
 //  画面遷移
 // ============================================================
 document.querySelectorAll('[data-level]').forEach(btn => btn.addEventListener('click', () => { initAudio(); startGame(btn.dataset.level); }));
+document.getElementById('vibTest').addEventListener('click', vibrateTest);
 document.getElementById('again').addEventListener('click', () => { initAudio(); startGame(levelKey); });
 document.getElementById('toTitle').addEventListener('click', () => {
   document.getElementById('end').classList.add('hidden');
