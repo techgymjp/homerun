@@ -255,7 +255,7 @@ const geo = (() => {
 // ============================================================
 //  サウンド（Web Audio で合成）
 // ============================================================
-let AC = null, master = null, noiseBuf = null, crowdGain = null;
+let AC = null, master = null, noiseBuf = null, crowdGain = null, bandBus = null, whooshGain = null;
 function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
@@ -269,9 +269,17 @@ function initAudio() {
     const lp = AC.createBiquadFilter(); lp.type = 'bandpass'; lp.frequency.value = 700; lp.Q.value = 0.6;
     crowdGain = AC.createGain(); crowdGain.gain.value = 0.035;
     src.connect(lp).connect(crowdGain).connect(master); src.start();
+    // 応援団用のバス（球場の残響つき）
+    bandBus = AC.createGain(); bandBus.gain.value = 0;
+    const rev = AC.createConvolver(), len = AC.sampleRate * 1.8;
+    const ir = AC.createBuffer(2, len, AC.sampleRate);
+    for (let c = 0; c < 2; c++) { const d2 = ir.getChannelData(c); for (let i = 0; i < len; i++) d2[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+    rev.buffer = ir;
+    const wet = AC.createGain(); wet.gain.value = 0.35;
+    bandBus.connect(master); bandBus.connect(rev).connect(wet).connect(master);
   } catch (e) { AC = null; }
 }
-function noiseShot({ t = 0, dur = 0.2, type = 'bandpass', f = 1000, f2 = null, q = 1, g = 0.5, attack = 0.002 }) {
+function noiseShot({ t = 0, dur = 0.2, type = 'bandpass', f = 1000, f2 = null, q = 1, g = 0.5, attack = 0.002, dest = master }) {
   if (!AC) return;
   const t0 = AC.currentTime + t;
   const s = AC.createBufferSource(); s.buffer = noiseBuf;
@@ -281,17 +289,17 @@ function noiseShot({ t = 0, dur = 0.2, type = 'bandpass', f = 1000, f2 = null, q
   gn.gain.setValueAtTime(0.0001, t0);
   gn.gain.exponentialRampToValueAtTime(g, t0 + attack);
   gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  s.connect(fl).connect(gn).connect(master);
+  s.connect(fl).connect(gn).connect(dest);
   s.start(t0, Math.random() * 1.5); s.stop(t0 + dur + 0.05);
 }
-function tone({ t = 0, dur = 0.2, f = 440, f2 = null, type = 'sine', g = 0.3 }) {
+function tone({ t = 0, dur = 0.2, f = 440, f2 = null, type = 'sine', g = 0.3, dest = master }) {
   if (!AC) return;
   const t0 = AC.currentTime + t;
   const o = AC.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t0);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
   const gn = AC.createGain();
   gn.gain.setValueAtTime(g, t0); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  o.connect(gn).connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
+  o.connect(gn).connect(dest); o.start(t0); o.stop(t0 + dur + 0.05);
 }
 const sfx = {
   swing() { noiseShot({ dur: 0.18, f: 500, f2: 1800, q: 1.2, g: 0.25, attack: 0.04 }); },
@@ -363,8 +371,110 @@ const sfx = {
     ng.gain.setTargetAtTime(0.0001, t0 + dur * 0.5, dur * 0.25);
     n.connect(ng).connect(out); n.start(t0, Math.random()); n.stop(t0 + dur + 0.6);
   },
+  // 投球の風切り音「シュー」：ボールが近づくほど大きく・高くなる
+  whoosh(T, kmh) {
+    if (!AC) return;
+    const t0 = AC.currentTime;
+    noiseShot({ dur: 0.08, f: 3200, q: 1.5, g: 0.12 });   // リリースの「ヒュッ」
+    const s = AC.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const hp = AC.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
+    const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(1100, t0); bp.frequency.exponentialRampToValueAtTime(1800 + kmh * 14, t0 + T);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.03, t0 + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.45, t0 + T);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + T + 0.15);
+    s.connect(hp).connect(bp).connect(g).connect(master);
+    s.start(t0, Math.random()); s.stop(t0 + T + 0.3);
+    whooshGain = g;
+  },
+  stopWhoosh() {
+    if (!AC || !whooshGain) return;
+    const t = AC.currentTime;
+    whooshGain.gain.cancelScheduledValues(t); whooshGain.gain.setValueAtTime(0.0001, t);
+    whooshGain = null;
+  },
   launch() { tone({ dur: 0.7, f: 500, f2: 1600, type: 'sine', g: 0.04 }); noiseShot({ dur: 0.6, type: 'highpass', f: 3000, g: 0.06, attack: 0.1 }); },
 };
+
+// ============================================================
+//  トランペット応援（オリジナル曲を Web Audio で合成）
+// ============================================================
+const BAND_EIGHTH = 60 / 150 / 2;   // 150BPM の8分音符
+// [音(MIDI), 長さ(8分音符の数)]  0 は休符
+const BAND_MELODY = [
+  [67, 1], [72, 1], [76, 2], [79, 2], [76, 2],
+  [77, 1], [77, 1], [81, 2], [79, 3], [0, 1],
+  [76, 1], [76, 1], [79, 2], [77, 1], [76, 1], [74, 2],
+  [72, 2], [74, 2], [76, 3], [0, 1],
+  [79, 2], [79, 1], [81, 1], [79, 2], [76, 2],
+  [77, 2], [77, 1], [79, 1], [77, 2], [74, 2],
+  [76, 1], [77, 1], [79, 2], [81, 1], [83, 1], [84, 2],
+  [79, 2], [84, 3], [0, 3],
+];
+const BAND_STEPS = (() => {
+  const steps = [];
+  let pos = 0;
+  for (const [n, l] of BAND_MELODY) { steps[pos] = { note: n ? n : 0, len: l }; pos += l; }
+  const melodyLen = pos, LOOP = melodyLen + 16;
+  for (let i = 0; i < LOOP; i++) {
+    steps[i] = steps[i] || {};
+    if (i < melodyLen) { steps[i].drum = i % 2 === 0; steps[i].clap = i % 2 === 0; }
+  }
+  // 間奏：太鼓とメガホンだけの「ドン・ドン・ドドドン」
+  for (const k of [0, 2, 4, 5, 6, 8, 10, 12, 13, 14]) { steps[melodyLen + k].drum = true; steps[melodyLen + k].clap = true; }
+  return steps;
+})();
+const band = { on: false, next: 0, i: 0, level: -1 };
+
+function brass(t0, midi, dur, g) {
+  const f = 440 * Math.pow(2, (midi - 69) / 12);
+  const out = AC.createGain();
+  out.gain.setValueAtTime(0.0001, t0);
+  out.gain.exponentialRampToValueAtTime(g, t0 + 0.03);
+  out.gain.setTargetAtTime(g * 0.7, t0 + 0.05, 0.08);
+  out.gain.setTargetAtTime(0.0001, t0 + dur - 0.05, 0.025);
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 3;
+  lp.frequency.setValueAtTime(f * 1.5, t0);
+  lp.frequency.exponentialRampToValueAtTime(f * 7, t0 + 0.04);
+  lp.frequency.setTargetAtTime(f * 4, t0 + 0.07, 0.1);
+  lp.connect(out).connect(bandBus);
+  // 数人のトランペット（わずかにピッチと出だしがずれる）
+  for (const d of [-8, 0, 9]) {
+    const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+    const st = t0 + Math.random() * 0.015;
+    o.detune.setValueAtTime(d - 50, st); o.detune.linearRampToValueAtTime(d, st + 0.05);
+    o.connect(lp); o.start(st); o.stop(t0 + dur + 0.3);
+  }
+}
+function bandDrum(t0, g) {
+  const o = AC.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(95, t0); o.frequency.exponentialRampToValueAtTime(45, t0 + 0.25);
+  const gn = AC.createGain(); gn.gain.setValueAtTime(g, t0); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+  o.connect(gn).connect(bandBus); o.start(t0); o.stop(t0 + 0.4);
+  noiseShot({ t: t0 - AC.currentTime, dur: 0.08, type: 'lowpass', f: 300, g: g * 0.5, dest: bandBus });
+}
+function bandClap(t0) {
+  for (let k = 0; k < 4; k++) noiseShot({ t: t0 - AC.currentTime + rand(0, 0.03), dur: 0.05, f: rand(1200, 2200), q: 0.8, g: rand(0.08, 0.14), dest: bandBus });
+}
+function bandStart() { if (!AC) return; band.on = true; band.i = 0; band.next = AC.currentTime + 0.3; band.level = -1; }
+function bandStop() { band.on = false; if (bandBus) bandBus.gain.setTargetAtTime(0, AC.currentTime, 0.3); }
+function bandUpdate() {
+  if (!AC || !band.on) return;
+  // 投球中は音量を下げて「シュー」を聞きやすく。ホームラン中は歓声を主役に
+  const level = state === 'pitch' ? 0.35 : (state === 'flight' && batted && batted.hr) ? 0.25 : 1;
+  if (level !== band.level) { band.level = level; bandBus.gain.setTargetAtTime(0.32 * level, AC.currentTime, 0.12); }
+  if (band.next < AC.currentTime) band.next = AC.currentTime + 0.05;   // タブ復帰時などの遅れを捨てる
+  while (band.next < AC.currentTime + 0.3) {
+    const st = BAND_STEPS[band.i], t = band.next;
+    if (st.note) { brass(t, st.note, st.len * BAND_EIGHTH, 0.22); brass(t, st.note - 12, st.len * BAND_EIGHTH, 0.07); }
+    if (st.drum) bandDrum(t, 0.55);
+    if (st.clap) bandClap(t);
+    band.next += BAND_EIGHTH;
+    band.i = (band.i + 1) % BAND_STEPS.length;
+  }
+}
 
 // ============================================================
 //  ゲーム状態
@@ -397,6 +507,7 @@ function startGame(key) {
   setHudPitch('―', '― km/h', '#fff');
   fireworks = []; rockets = []; hrBanner = null; msg = null; marks = null;
   toReady(1200);
+  bandStart();
 }
 
 function toReady(wait = 900) {
@@ -448,6 +559,7 @@ function releasePitch() {
     trail: [], passed: false, mittDone: false,
   };
   state = 'pitch'; stateT = now;
+  sfx.whoosh(T, kmh);
 }
 
 function ballPos(p, t) {
@@ -509,6 +621,7 @@ function doSwing(sx, sy, t) {
 //  打球
 // ============================================================
 function hitBall(nt, ns, ex, ey, dt) {
+  sfx.stopWhoosh();
   const e = Math.min(1.6, Math.hypot(nt, ns));
   let ev = 184 * (1 - 0.45 * Math.pow(e, 1.5)) + (pitch.kmh - 140) * 0.08 + rand(-3, 3);
   ev = Math.max(60, ev);
@@ -613,6 +726,7 @@ function nextPitch() {
 }
 
 function endGame() {
+  bandStop();
   state = 'end';
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('eHr').textContent = stats.hr;
@@ -1179,6 +1293,7 @@ function update(dt) {
     if (now - stateT > 1500) nextPitch();
   }
   updateFireworks(dt);
+  bandUpdate();
 }
 
 function render(time) {
