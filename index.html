@@ -503,10 +503,20 @@ function vibrateTest() {
     : (framed ? 'ブラウザにブロックされました（アプリ内のプレビュー表示では振動できません。Chrome で直接開いてください）'
               : 'ブラウザにブロックされました（Chrome で直接開いているか確認してください）');
 }
+// 打撃判定は指が触れた瞬間(pointerdown)に行うが、Chrome はタッチの pointerdown を
+// ユーザー操作として扱わず振動を無視することがあるため、指を離した瞬間にも鳴らし直す
+let pendingHaptic = null;
 function haptic(pattern) {
-  try { if (navigator.vibrate) { navigator.vibrate(pattern); return; } } catch (e) {}
-  try { hapticSwitch.click(); } catch (e) {}
+  pendingHaptic = { pattern, t: performance.now() };
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}   // iPhone は指を離した時だけ鳴らす
 }
+function flushHaptic() {
+  if (!pendingHaptic) return;
+  const p = pendingHaptic; pendingHaptic = null;
+  if (performance.now() - p.t > 1500) return;
+  try { if (navigator.vibrate) navigator.vibrate(p.pattern); else hapticSwitch.click(); } catch (e) {}
+}
+for (const ev of ['pointerup', 'touchend']) cv.addEventListener(ev, flushHaptic);
 
 // ============================================================
 //  ゲーム状態
@@ -713,7 +723,7 @@ function hitBall(nt, ns, ex, ey, dt) {
   if (Math.abs(dt) <= 15 && ns < 0.35) stats.just++;
   const power = clamp(1.2 - e, 0.2, 1);
   if (kind === 'foul') sfx.foul(); else sfx.crack(power);
-  haptic(kind === 'foul' ? 40 : Math.round(50 + power * 50));   // 芯で捉えるほど長く（短すぎると端末によっては感じない）
+  haptic(kind === 'foul' ? 80 : kind === 'hr' ? [180, 70, 180] : Math.round(100 + power * 80));   // 芯で捉えるほど長く、ホームランは2回
   if (kind === 'hit') { stats.hit++; }
   if (kind === 'hit') sfx.cheer(0.5, 1.4);
   else if (label === '惜しい！') sfx.sigh(1);
