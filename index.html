@@ -477,6 +477,26 @@ function bandUpdate() {
 }
 
 // ============================================================
+//  振動（スマホ）
+//  Android: Vibration API。iPhone は非対応のため、iOS 18 以降の
+//  スイッチ型チェックボックスが切り替わる時の触覚フィードバックで代用する
+// ============================================================
+const hapticSwitch = (() => {
+  const label = document.createElement('label');
+  label.setAttribute('aria-hidden', 'true');
+  label.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none';
+  const input = document.createElement('input');
+  input.type = 'checkbox'; input.setAttribute('switch', ''); input.tabIndex = -1;
+  label.appendChild(input);
+  document.body.appendChild(label);
+  return label;
+})();
+function haptic(pattern) {
+  try { if (navigator.vibrate) { navigator.vibrate(pattern); return; } } catch (e) {}
+  try { hapticSwitch.click(); } catch (e) {}
+}
+
+// ============================================================
 //  ゲーム状態
 // ============================================================
 let level = LEVELS.legend, levelKey = 'legend';
@@ -681,6 +701,7 @@ function hitBall(nt, ns, ex, ey, dt) {
   if (Math.abs(dt) <= 15 && ns < 0.35) stats.just++;
   const power = clamp(1.2 - e, 0.2, 1);
   if (kind === 'foul') sfx.foul(); else sfx.crack(power);
+  haptic(kind === 'foul' ? 15 : Math.round(20 + power * 25));   // 芯で捉えるほど長く
   if (kind === 'hit') { stats.hit++; }
   if (kind === 'hit') sfx.cheer(0.5, 1.4);
   else if (label === '惜しい！') sfx.sigh(1);
@@ -1280,7 +1301,7 @@ function update(dt) {
       hrBanner = { t: now, dist: b.dist, count: stats.hr };
       launchFireworks(10);
       sfx.cheer(1, 4.5);
-      if (navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (e) {}
+      if (navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (e) {}   // ホームラン（Android のみ）
       updateHud();
     }
     if (!b.done && idx >= b.path.length - 1) {
