@@ -1223,21 +1223,35 @@ function drawBatterBody() {
   for (const f of [pts.bf]) { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(f.x, f.y, 0.1 * f.s, 0.04 * f.s, 0, 0, 7); ctx.fill(); }
   // 胴体
   const shC = { x: (pts.shB.x + pts.shF.x) / 2, y: (pts.shB.y + pts.shF.y) / 2 };
-  line([pts.hip, shC], 0.36, uni, sAvg);
+  line([pts.hip, shC], 0.32, uni, sAvg);
   line([pts.shB, pts.shF], 0.2, uni, sAvg);
-  // 背番号
-  ctx.fillStyle = navy; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `900 ${0.16 * sAvg}px sans-serif`;
-  ctx.fillText('55', lerp(pts.hip.x, shC.x, 0.6), lerp(pts.hip.y, shC.y, 0.6));
+  // 捕手側からは右打者の右半身が見える。背番号は背中（画面の外側）なので描かない
   // ベルト
   ctx.strokeStyle = navy; ctx.lineWidth = 0.04 * sAvg;
-  ctx.beginPath(); ctx.moveTo(pts.hip.x - 0.17 * sAvg, pts.hip.y); ctx.lineTo(pts.hip.x + 0.17 * sAvg, pts.hip.y); ctx.stroke();
-  // ヘルメット
-  const hd = pts.head;
-  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(hd.x, hd.y + 0.04 * hd.s, 0.1 * hd.s, 0, 7); ctx.fill();
-  ctx.fillStyle = navy; ctx.beginPath(); ctx.arc(hd.x, hd.y, 0.13 * hd.s, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(hd.x + 0.06 * hd.s, hd.y + 0.02 * hd.s, 0.06 * hd.s, 0.08 * hd.s, 0, 0, 7); ctx.fill(); // 耳当て
-  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.arc(hd.x - 0.04 * hd.s, hd.y - 0.06 * hd.s, 0.035 * hd.s, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(pts.hip.x - 0.15 * sAvg, pts.hip.y); ctx.lineTo(pts.hip.x + 0.15 * sAvg, pts.hip.y); ctx.stroke();
+  // 頭：顔は投手方向（画面の奥）を向く。こちらからは後頭部と右耳、右頬の輪郭が見える
+  const H = ps.head, hd = pts.head, hs = hd.s;
+  const at = (dx, dy, dz) => proj(H[0] + dx, H[1] + dy, H[2] + dz);
+  const neckTop = at(0, -0.06, -0.02), neckBot = proj((ps.shB[0] + ps.shF[0]) / 2, (ps.shB[1] + ps.shF[1]) / 2, (ps.shB[2] + ps.shF[2]) / 2);
+  if (neckTop && neckBot) line([neckBot, neckTop], 0.11, skin, hs);
+  ctx.fillStyle = '#1b1410'; ctx.beginPath(); ctx.arc(hd.x, hd.y + 0.02 * hs, 0.1 * hs, 0, 7); ctx.fill();          // 後頭部（髪）
+  const cheek = at(0.06, -0.03, 0.05);
+  if (cheek) { ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(cheek.x, cheek.y, 0.04 * hs, 0.065 * hs, -0.15, 0, 7); ctx.fill(); }  // 右頬・あご
+  const ear = at(0.075, -0.005, -0.01);
+  if (ear) {
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(ear.x, ear.y, 0.022 * hs, 0.034 * hs, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(120,60,30,0.45)'; ctx.beginPath(); ctx.ellipse(ear.x - 0.004 * hs, ear.y, 0.01 * hs, 0.018 * hs, 0, 0, 7); ctx.fill();
+  }
+  // ヘルメット（右打者用は耳当てが投手側＝左耳なので、こちらからは見えない）
+  ctx.fillStyle = navy;
+  ctx.beginPath(); ctx.ellipse(hd.x - 0.005 * hs, hd.y - 0.015 * hs, 0.125 * hs, 0.105 * hs, 0, Math.PI * 0.92, Math.PI * 2.08); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hd.x - 0.045 * hs, hd.y + 0.02 * hs, 0.08 * hs, 0.06 * hs, 0, 0, 7); ctx.fill();   // 後頭部を覆う部分
+  const brim = at(0.05, 0.035, 0.17), brimRoot = at(0.03, 0.04, 0.06);
+  if (brim && brimRoot) {   // つばは投手方向へ伸びる
+    ctx.strokeStyle = navy; ctx.lineWidth = 0.035 * hs; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(brimRoot.x, brimRoot.y); ctx.lineTo(brim.x, brim.y); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.ellipse(hd.x - 0.03 * hs, hd.y - 0.07 * hs, 0.045 * hs, 0.02 * hs, -0.3, 0, 7); ctx.fill();
   // 手前の腕
   const eB = elbow(ps.shB, -1);
   if (eB) line([pts.shB, eB, pts.hands], 0.11, '#b9bfcb', pts.shB.s, true);
