@@ -143,7 +143,7 @@ resize();
 // ============================================================
 //  カメラと投影
 // ============================================================
-const CAM0 = { x: 0, y: 1.45, z: -2.4 };
+const CAM0 = { x: -0.2, y: 1.45, z: -2.4 }; // 少し三塁側（打者寄り）から見る
 const cam = { x: CAM0.x, y: CAM0.y, z: CAM0.z, yaw: 0, pitch: 0, zoom: 1 };
 const NEAR = 0.1;
 
@@ -480,7 +480,7 @@ function onTap(sx, sy, t) {
 
 function plateFromScreen(sx, sy) {
   const D = 0 - CAM0.z;
-  return { x: (sx - CX) * D / F0, y: CAM0.y - (sy - CY) * D / F0 };
+  return { x: CAM0.x + (sx - CX) * D / F0, y: CAM0.y - (sy - CY) * D / F0 };
 }
 
 function doSwing(sx, sy, t) {
@@ -928,33 +928,135 @@ function drawMarks() {
   ctx.restore();
 }
 
-function drawBat() {
-  if (!swing) return;
-  const e = (now - swing.t) / 160;
-  if (e > 1.6) return;
+// 打者（右打者・三塁側の打席）の姿勢。ワールド座標(m)
+const BATTER_POSES = {
+  stance: { bf: [-0.72, 0, -0.36], ff: [-0.66, 0, 0.36], bk: [-0.66, 0.48, -0.3], fk: [-0.6, 0.5, 0.28], hip: [-0.7, 0.93, -0.02],
+            shB: [-0.76, 1.42, -0.2], shF: [-0.68, 1.43, 0.17], head: [-0.71, 1.63, -0.02], hands: [-0.6, 1.42, -0.32] },
+  hit:    { bf: [-0.72, 0.08, -0.4], ff: [-0.66, 0, 0.42], bk: [-0.6, 0.45, -0.25], fk: [-0.62, 0.5, 0.32], hip: [-0.66, 0.9, 0],
+            shB: [-0.58, 1.36, -0.12], shF: [-0.76, 1.38, 0.12], head: [-0.68, 1.58, 0.04], hands: [-0.42, 1.0, -0.02] },
+  follow: { bf: [-0.7, 0.12, -0.38], ff: [-0.66, 0, 0.42], bk: [-0.58, 0.45, -0.2], fk: [-0.62, 0.5, 0.32], hip: [-0.64, 0.9, 0.02],
+            shB: [-0.54, 1.4, 0.04], shF: [-0.8, 1.4, -0.04], head: [-0.68, 1.6, 0.06], hands: [-0.78, 1.5, 0.12] },
+};
+const STANCE_TIP = [-0.12, 0.72, -0.25];   // 構えたバットの先端（手元からの相対）
+const FOLLOW_TIP = [0.2, 0.3, -0.7];       // 振り抜いた後のバット先端
+const SWING_MS = 160;
+
+function lerpPose(a, b, k) {
+  const o = {};
+  for (const key in a) o[key] = [lerp(a[key][0], b[key][0], k), lerp(a[key][1], b[key][1], k), lerp(a[key][2], b[key][2], k)];
+  return o;
+}
+function batterPose() {
+  const P = BATTER_POSES;
+  if (!swing) {
+    const o = lerpPose(P.stance, P.stance, 0);
+    o.hands[1] += Math.sin(now / 320) * 0.012;   // 構えで小さくリズムを取る
+    return { pose: o, e: -1 };
+  }
+  const e = (now - swing.t) / SWING_MS;
+  const hit = lerpPose(P.hit, P.hit, 0);
+  hit.hands[1] = clamp(plateFromScreen(swing.sx, swing.sy).y + 0.12, 0.65, 1.3);
   const k = clamp(e, 0, 1);
-  // 右打者：左下に手元、スイングで右へ振り抜く
-  const pivot = { x: Math.min(swing.sx - F0 * 0.18, CX - F0 * 0.12), y: swing.sy + F0 * 0.07 };
-  const len = Math.hypot(swing.sx - pivot.x, swing.sy - pivot.y) * 1.25;
-  const aHit = Math.atan2(swing.sy - pivot.y, swing.sx - pivot.x);
-  const ang = lerp(aHit - 2.0, aHit + 1.2, smooth(k));
+  const pose = k < 0.55 ? lerpPose(P.stance, hit, smooth(k / 0.55)) : lerpPose(hit, P.follow, smooth((k - 0.55) / 0.45));
+  return { pose, e };
+}
+
+function drawWorldBat(h, tipRel) {
+  const a = proj(h[0], h[1], h[2]), b = proj(h[0] + tipRel[0], h[1] + tipRel[1], h[2] + tipRel[2]);
+  if (!a || !b) return;
+  const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.hypot(b.x - a.x, b.y - a.y);
+  ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(ang);
+  const w0 = 0.016 * a.s, w1 = 0.034 * b.s;
+  const grad = ctx.createLinearGradient(0, 0, len, 0);
+  grad.addColorStop(0, '#5a3418'); grad.addColorStop(0.3, '#c98a4b'); grad.addColorStop(1, '#e9b77a');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.moveTo(-w0 * 2, -w0); ctx.lineTo(len * 0.45, -w0 * 1.3); ctx.lineTo(len, -w1);
+  ctx.arc(len, 0, w1, -Math.PI / 2, Math.PI / 2); ctx.lineTo(len * 0.45, w0 * 1.3); ctx.lineTo(-w0 * 2, w0); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// 打者の体（ボールより先に描く）
+function drawBatterBody() {
+  const { pose: ps } = batterPose();
+  const pts = {};
+  for (const k in ps) { pts[k] = proj(ps[k][0], ps[k][1], ps[k][2]); if (!pts[k]) return; }
+  const uni = '#c9ced8', uniDark = '#9aa1ad', navy = '#13234f', skin = '#d9a77c';
+  const line = (list, wM, col, s, outline) => {
+    if (outline) line(list, wM + 0.025, 'rgba(40,46,60,0.75)', s);
+    ctx.strokeStyle = col; ctx.lineWidth = wM * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); list.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+  };
+  const elbow = (sh, side) => {
+    const h = ps.hands, m = [lerp(sh[0], h[0], 0.5) - 0.08, lerp(sh[1], h[1], 0.5) - 0.1, lerp(sh[2], h[2], 0.5) + side * 0.05];
+    return proj(m[0], m[1], m[2]);
+  };
+  const sAvg = pts.hip.s;
   ctx.save();
-  ctx.globalAlpha = e > 1 ? 1 - (e - 1) / 0.6 : 1;
-  // 残像
-  for (let j = 3; j >= 0; j--) {
-    const aj = ang - j * 0.18;
-    ctx.globalAlpha *= j ? 0.6 : 1;
-    ctx.save(); ctx.translate(pivot.x, pivot.y); ctx.rotate(aj);
-    const grad = ctx.createLinearGradient(0, 0, len, 0);
-    grad.addColorStop(0, '#5a3418'); grad.addColorStop(0.3, '#c98a4b'); grad.addColorStop(1, '#e9b77a');
-    ctx.fillStyle = j ? 'rgba(233,183,122,0.25)' : grad;
-    ctx.beginPath();
-    ctx.moveTo(0, -len * 0.012); ctx.lineTo(len * 0.45, -len * 0.018); ctx.lineTo(len, -len * 0.035);
-    ctx.arc(len, 0, len * 0.035, -Math.PI / 2, Math.PI / 2);
-    ctx.lineTo(len * 0.45, len * 0.018); ctx.lineTo(0, len * 0.012); ctx.closePath(); ctx.fill();
+  // 影
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse((pts.bf.x + pts.ff.x) / 2, (pts.bf.y + pts.ff.y) / 2, 0.45 * sAvg, 0.08 * sAvg, 0, 0, 7); ctx.fill();
+  // 奥側（投手寄り）の脚と腕
+  line([pts.hip, pts.fk, pts.ff], 0.16, uniDark, pts.fk.s);
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(pts.ff.x, pts.ff.y, 0.1 * pts.ff.s, 0.04 * pts.ff.s, 0, 0, 7); ctx.fill();
+  const eF = elbow(ps.shF, 1);
+  if (eF) line([pts.shF, eF, pts.hands], 0.1, uniDark, pts.shF.s);
+  // 手前の脚
+  line([pts.hip, pts.bk, pts.bf], 0.17, uni, pts.bk.s);
+  for (const f of [pts.bf]) { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(f.x, f.y, 0.1 * f.s, 0.04 * f.s, 0, 0, 7); ctx.fill(); }
+  // 胴体
+  const shC = { x: (pts.shB.x + pts.shF.x) / 2, y: (pts.shB.y + pts.shF.y) / 2 };
+  line([pts.hip, shC], 0.36, uni, sAvg);
+  line([pts.shB, pts.shF], 0.2, uni, sAvg);
+  // 背番号
+  ctx.fillStyle = navy; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${0.16 * sAvg}px sans-serif`;
+  ctx.fillText('55', lerp(pts.hip.x, shC.x, 0.6), lerp(pts.hip.y, shC.y, 0.6));
+  // ベルト
+  ctx.strokeStyle = navy; ctx.lineWidth = 0.04 * sAvg;
+  ctx.beginPath(); ctx.moveTo(pts.hip.x - 0.17 * sAvg, pts.hip.y); ctx.lineTo(pts.hip.x + 0.17 * sAvg, pts.hip.y); ctx.stroke();
+  // ヘルメット
+  const hd = pts.head;
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(hd.x, hd.y + 0.04 * hd.s, 0.1 * hd.s, 0, 7); ctx.fill();
+  ctx.fillStyle = navy; ctx.beginPath(); ctx.arc(hd.x, hd.y, 0.13 * hd.s, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hd.x + 0.06 * hd.s, hd.y + 0.02 * hd.s, 0.06 * hd.s, 0.08 * hd.s, 0, 0, 7); ctx.fill(); // 耳当て
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.arc(hd.x - 0.04 * hd.s, hd.y - 0.06 * hd.s, 0.035 * hd.s, 0, 7); ctx.fill();
+  // 手前の腕
+  const eB = elbow(ps.shB, -1);
+  if (eB) line([pts.shB, eB, pts.hands], 0.11, '#b9bfcb', pts.shB.s, true);
+  ctx.restore();
+}
+
+// バット（ボールより後に描く）。スイング中は手元からタップ位置へ振り抜く
+function drawBat() {
+  const { pose: ps, e } = batterPose();
+  const hands = proj(ps.hands[0], ps.hands[1], ps.hands[2]);
+  if (!hands) return;
+  if (e < 0 || e > 1) {
+    drawWorldBat(ps.hands, e < 0 ? STANCE_TIP : FOLLOW_TIP);
+  } else {
+    const k = clamp(e, 0, 1);
+    const len = Math.max(F0 * 0.25, Math.hypot(swing.sx - hands.x, swing.sy - hands.y) * 1.15);
+    const aHit = Math.atan2(swing.sy - hands.y, swing.sx - hands.x);
+    const ang = lerp(aHit - 2.0, aHit + 1.4, smooth(k));
+    ctx.save();
+    for (let j = 3; j >= 0; j--) {
+      const aj = ang - j * 0.18;
+      ctx.globalAlpha = j ? 0.35 / j : 1;
+      ctx.save(); ctx.translate(hands.x, hands.y); ctx.rotate(aj);
+      const grad = ctx.createLinearGradient(0, 0, len, 0);
+      grad.addColorStop(0, '#5a3418'); grad.addColorStop(0.3, '#c98a4b'); grad.addColorStop(1, '#e9b77a');
+      ctx.fillStyle = j ? 'rgba(233,183,122,0.6)' : grad;
+      ctx.beginPath();
+      ctx.moveTo(0, -len * 0.012); ctx.lineTo(len * 0.45, -len * 0.018); ctx.lineTo(len, -len * 0.035);
+      ctx.arc(len, 0, len * 0.035, -Math.PI / 2, Math.PI / 2);
+      ctx.lineTo(len * 0.45, len * 0.018); ctx.lineTo(0, len * 0.012); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
   }
-  ctx.restore();
+  // バッティンググローブ
+  ctx.fillStyle = '#f2f2f2';
+  ctx.beginPath(); ctx.arc(hands.x, hands.y, 0.05 * hands.s, 0, 7); ctx.fill();
 }
 
 // ============================================================
@@ -1086,6 +1188,7 @@ function render(time) {
   drawField();
   drawPitcher();
   if (state !== 'title') drawZone();
+  if (state !== 'title') drawBatterBody();
 
   // 投球中のボール
   if (pitch && (state === 'pitch' || state === 'result') && !(batted)) {
@@ -1114,7 +1217,7 @@ function render(time) {
     drawBallAt(batted.cur, true);
   }
   drawMarks();
-  drawBat();
+  if (state !== 'title') drawBat();
   // インパクトの閃光
   const fe = (now - flashT) / 1000;
   if (fe < 0.25 && swing) {
