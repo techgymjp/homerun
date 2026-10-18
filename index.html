@@ -52,6 +52,9 @@
   .calib .row { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0; }
   .calib small { display: block; color: #b9c6e8; font-size: 11px; }
   .sbtn { font: inherit; font-weight: 800; font-size: 15px; padding: 6px 14px; border-radius: 10px; border: 0; background: #dfe7f7; color: #1b2440; }
+  .btn.share { background: linear-gradient(#7fe3ff, #2f9bff); color: #031a33; box-shadow: 0 4px 0 #11589b, 0 8px 18px rgba(0,0,0,.4); }
+  .shareRow { display: flex; gap: 8px; justify-content: center; margin: -2px 0 6px; }
+  .shareRow .sbtn { flex: 1; text-decoration: none; text-align: center; cursor: pointer; }
   .rank { font-size: 26px; font-weight: 900; color: #ff9d3c; margin: 6px 0; }
 </style>
 </head>
@@ -100,6 +103,12 @@
       <div class="stat"><b id="eHit">0</b><span>安打（本塁打含む）</span></div>
       <div class="stat"><b id="eLong">0m</b><span>最長飛距離</span></div>
       <div class="stat"><b id="eJust">0</b><span>ジャストミート</span></div>
+    </div>
+    <button class="btn share" id="shareBtn">📤 結果をシェア<small id="shareMsg">成績画像つきでシェアできます</small></button>
+    <div class="shareRow">
+      <a class="sbtn" id="shareX" target="_blank" rel="noopener">𝕏 ポスト</a>
+      <a class="sbtn" id="shareLine" target="_blank" rel="noopener">LINE</a>
+      <button class="sbtn" id="shareCopy">コピー</button>
     </div>
     <button class="btn" id="again">もう一度</button>
     <button class="btn alt" id="toTitle">難易度を選ぶ</button>
@@ -839,7 +848,83 @@ function endGame() {
   const h = stats.hr;
   const rank = h >= 50 ? '伝説のスラッガー' : h >= 30 ? 'ホームラン王' : h >= 15 ? '4番バッター' : h >= 5 ? '高校球児' : h >= 1 ? '草野球の星' : '修行が必要…';
   document.getElementById('eRank').textContent = level.name + '：' + rank;
+  lastResult = { level: level.name, rank, hr: stats.hr, hits: totalHits(), ab: stats.ab, avg: formatAvg(totalHits(), stats.ab), longest: stats.longest };
+  prepareShare();
   document.getElementById('end').classList.remove('hidden');
+}
+
+// ============================================================
+//  シェア（試合終了画面）
+//  対応端末では成績画像つきで共有シートを開き、ダメならX・LINE・コピーで共有
+// ============================================================
+let lastResult = null;
+const shareUrl = () => (/^https?:/.test(location.href) ? location.href.split('#')[0] : '');
+function shareText() {
+  const r = lastResult;
+  return `⚾ホームラン競争【${r.level}】で${r.hr}本塁打！\n打率${r.avg}（${r.hits}安打/${r.ab}打数）・最長${r.longest}m\n称号：${r.rank}\n#ホームラン競争 #体感160km`;
+}
+function prepareShare() {
+  const text = shareText(), url = shareUrl();
+  $('shareX').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + (url ? '&url=' + encodeURIComponent(url) : '');
+  $('shareLine').href = 'https://line.me/R/share?text=' + encodeURIComponent(text + (url ? '\n' + url : ''));
+  $('shareMsg').textContent = navigator.share ? '成績画像つきでシェアできます' : 'X・LINE・コピーからシェアしてください';
+}
+// 成績カード画像（1200x630）
+function makeShareImage() {
+  const r = lastResult, c = document.createElement('canvas');
+  c.width = 1200; c.height = 630;
+  const g = c.getContext('2d');
+  const bg = g.createLinearGradient(0, 0, 0, 630);
+  bg.addColorStop(0, '#050b1e'); bg.addColorStop(1, '#1b2c5c');
+  g.fillStyle = bg; g.fillRect(0, 0, 1200, 630);
+  for (let i = 0; i < 120; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.5})`; g.fillRect(Math.random() * 1200, Math.random() * 300, 2, 2); }
+  // 花火
+  for (const [x, y, col] of [[150, 140, '#ff4d4d'], [1060, 120, '#ffd84a'], [980, 300, '#4dd2ff']]) {
+    g.strokeStyle = col; g.lineWidth = 3;
+    for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; g.beginPath(); g.moveTo(x + Math.cos(a) * 20, y + Math.sin(a) * 20); g.lineTo(x + Math.cos(a) * 80, y + Math.sin(a) * 80); g.stroke(); }
+  }
+  g.fillStyle = '#0d4a35'; g.fillRect(0, 560, 1200, 70);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const font = (w, sz) => `${w} ${sz}px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif`;
+  g.fillStyle = '#9fd8ff'; g.font = font(800, 34); g.fillText(`ホームラン競争【${r.level}】`, 600, 70);
+  const gold = g.createLinearGradient(0, 120, 0, 280);
+  gold.addColorStop(0, '#fff6c4'); gold.addColorStop(0.5, '#ffd000'); gold.addColorStop(1, '#ff8a00');
+  g.fillStyle = gold; g.font = font(900, 150); g.fillText(`${r.hr}本塁打`, 600, 200);
+  g.fillStyle = '#ff9d3c'; g.font = font(900, 52); g.fillText(`称号：${r.rank}`, 600, 330);
+  g.fillStyle = '#ffffff'; g.font = font(800, 44);
+  g.fillText(`打率 ${r.avg}（${r.hits}安打 / ${r.ab}打数）`, 600, 420);
+  g.fillText(`最長飛距離 ${r.longest}m`, 600, 490);
+  g.fillStyle = '#d9e2f5'; g.font = font(700, 28); g.fillText('#ホームラン競争  #体感160km', 600, 595);
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+async function shareResult() {
+  if (!lastResult) return;
+  const text = shareText(), url = shareUrl(), msg = $('shareMsg');
+  if (navigator.share) {
+    try {
+      const blob = await makeShareImage();
+      const file = blob && new File([blob], 'homerun-result.png', { type: 'image/png' });
+      const data = { title: 'ホームラン競争', text: text + (url ? '\n' + url : '') };
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
+      await navigator.share(data);
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // ユーザーが閉じただけ
+    }
+  }
+  copyResult();
+}
+async function copyResult() {
+  const text = shareText() + (shareUrl() ? '\n' + shareUrl() : '');
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
+  if (!ok) {
+    try {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+      ta.select(); ok = document.execCommand('copy'); ta.remove();
+    } catch (e) {}
+  }
+  $('shareMsg').textContent = ok ? '結果をコピーしました！SNSに貼り付けてください' : 'コピーできませんでした。X・LINEボタンを使ってください';
 }
 
 // ============================================================
@@ -1474,6 +1559,8 @@ document.getElementById('latMinus').addEventListener('click', () => nudgeCalib(-
 document.getElementById('latPlus').addEventListener('click', () => nudgeCalib(10));
 document.getElementById('latAuto').addEventListener('change', e => { calib.auto = e.target.checked; calib.samples = []; saveCalib(); });
 saveCalib();
+document.getElementById('shareBtn').addEventListener('click', shareResult);
+document.getElementById('shareCopy').addEventListener('click', copyResult);
 document.getElementById('again').addEventListener('click', () => { initAudio(); startGame(levelKey); });
 document.getElementById('toTitle').addEventListener('click', () => {
   document.getElementById('end').classList.add('hidden');
