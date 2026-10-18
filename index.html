@@ -858,7 +858,8 @@ function endGame() {
 //  対応端末では成績画像つきで共有シートを開き、ダメならX・LINE・コピーで共有
 // ============================================================
 let lastResult = null;
-const shareUrl = () => (/^https?:/.test(location.href) ? location.href.split('#')[0] : '');
+const SHARE_URL = 'https://techgym.jp/column/claude-code-game-homerun/';   // シェア時に添えるURL（紹介記事）
+const shareUrl = () => SHARE_URL;
 function shareText() {
   const r = lastResult;
   return `⚾ホームラン競争【${r.level}】で${r.hr}本塁打！\n打率${r.avg}（${r.hits}安打/${r.ab}打数）・最長${r.longest}m\n称号：${r.rank}\n#ホームラン競争 #体感160km`;
