@@ -1,0 +1,8 @@
+{
+  "appId": "jp.techgym.homerun",
+  "appName": "ホームラン競争",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#050b1e"
+  }
+}

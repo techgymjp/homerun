@@ -28,3 +28,7 @@
 | ルーキー | 約0.68倍 | ±約130ms |
 
 外部ライブラリや画像・音声ファイルは使っていません。描画は Canvas、効果音・歓声・花火の音は Web Audio API で合成しています。
+
+## Android 版
+
+Capacitor で Android アプリにしています（パッケージ名 `jp.techgym.homerun`）。ビルドは GitHub Actions で行い、動作確認用 APK は Release `android-latest` からダウンロードできます。Google Play 公開までの手順は [docs/ANDROID.md](docs/ANDROID.md) を参照してください。

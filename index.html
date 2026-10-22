@@ -55,6 +55,10 @@
   .btn.share { background: linear-gradient(#7fe3ff, #2f9bff); color: #031a33; box-shadow: 0 4px 0 #11589b, 0 8px 18px rgba(0,0,0,.4); }
   .shareRow { display: flex; gap: 8px; justify-content: center; margin: -2px 0 6px; }
   .shareRow .sbtn { flex: 1; text-decoration: none; text-align: center; cursor: pointer; }
+  .legal { text-align: center; font-size: 12px; color: #8fa0c8; margin: 12px 0 0; }
+  .legal a { color: #9fd8ff; }
+  .legal #buildInfo { margin-right: 8px; }
+  #pause { z-index: 20; cursor: pointer; }
   .rank { font-size: 26px; font-weight: 900; color: #ff9d3c; margin: 6px 0; }
 </style>
 </head>
@@ -90,6 +94,11 @@
       <small>スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ</small>
     </div>
     <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px">📳 振動テスト<small id="vibResult">スマホが振動するか確認できます</small></button>
+    <p class="legal">
+      <span id="buildInfo"></span>
+      <a href="https://techgym.jp/privacy-policy/" target="_blank" rel="noopener">プライバシーポリシー</a>
+      <span id="adPrivacy" class="hidden">｜<a href="#" id="adPrivacyLink">広告の設定</a></span>
+    </p>
   </div>
 </div>
 
@@ -115,6 +124,16 @@
   </div>
 </div>
 
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <h1>一時停止中</h1>
+    <p style="text-align:center">画面をタップすると再開します</p>
+  </div>
+</div>
+
+<script src="js/build-info.js"></script>
+<script src="js/ads-config.js"></script>
+<script src="js/ads.js"></script>
 <script>
 'use strict';
 // ============================================================
@@ -592,6 +611,9 @@ let hrBanner = null;
 let flashT = -1e9;
 let windup = null;
 let now = performance.now();
+// ゲーム内の時計。ポーズ中は止まる（投球のタイミングを時刻で管理しているため、ポーズ明けにずれないようにする）
+let paused = false, pauseStart = 0, pauseOffset = 0;
+const clock = () => performance.now() - pauseOffset;
 
 function resetStats() { stats = { hr: 0, hit: 0, longest: 0, just: 0, ab: 0 }; }
 // 安打数は本塁打を含む。打数は投球が終わった球数（1球＝1打数として数える）
@@ -679,8 +701,9 @@ function ballPos(p, t) {
 cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   initAudio();
-  const t = (e.timeStamp && Math.abs(e.timeStamp - performance.now()) < 200) ? e.timeStamp : performance.now();
-  onTap(e.clientX, e.clientY, t);
+  if (paused) { setPaused(false); return; }
+  const real = (e.timeStamp && Math.abs(e.timeStamp - performance.now()) < 200) ? e.timeStamp : performance.now();
+  onTap(e.clientX, e.clientY, real - pauseOffset);
 }, { passive: false });
 document.addEventListener('touchmove', e => { if (!e.target.closest('.overlay')) e.preventDefault(); }, { passive: false });
 document.addEventListener('gesturestart', e => e.preventDefault());
@@ -868,7 +891,9 @@ function prepareShare() {
   const text = shareText(), url = shareUrl();
   $('shareX').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + (url ? '&url=' + encodeURIComponent(url) : '');
   $('shareLine').href = 'https://line.me/R/share?text=' + encodeURIComponent(text + (url ? '\n' + url : ''));
-  $('shareMsg').textContent = navigator.share ? '成績画像つきでシェアできます' : 'X・LINE・コピーからシェアしてください';
+  $('shareMsg').textContent = NATIVE ? 'X・LINE などのアプリを選んでシェア' : navigator.share ? '成績画像つきでシェアできます' : 'X・LINE・コピーからシェアしてください';
+  // アプリでは共有メニューに X・LINE も出るので、個別のボタンは隠す
+  document.querySelector('.shareRow').classList.toggle('hidden', NATIVE);
 }
 // 成績カード画像（1200x630）
 function makeShareImage() {
@@ -901,6 +926,12 @@ function makeShareImage() {
 async function shareResult() {
   if (!lastResult) return;
   const text = shareText(), url = shareUrl(), msg = $('shareMsg');
+  // Android アプリでは Android の共有メニューを出す
+  const nativeShare = plugin('Share');
+  if (nativeShare) {
+    try { await nativeShare.share({ title: 'ホームラン競争', text, url, dialogTitle: '結果をシェア' }); } catch (e) { /* キャンセル */ }
+    return;
+  }
   if (navigator.share) {
     try {
       const blob = await makeShareImage();
@@ -927,6 +958,48 @@ async function copyResult() {
   }
   $('shareMsg').textContent = ok ? '結果をコピーしました！SNSに貼り付けてください' : 'コピーできませんでした。X・LINEボタンを使ってください';
 }
+
+// ============================================================
+//  ポーズ・Android アプリ（Capacitor）対応
+//  参考実装：techgymjp/jet-fighter の js/main.js
+// ============================================================
+// js/ads.js が無い（index.html 単体で開いた）場合でも動くよう、広告は何もしない代用品に差し替える
+const ads = typeof Ads !== 'undefined' ? Ads : {
+  available: false, privacyOptionsRequired: false, initDone: Promise.resolve(),
+  showInterstitial: () => Promise.resolve(), showPrivacyOptions: () => Promise.resolve(),
+};
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const plugin = name => (NATIVE && window.Capacitor.Plugins ? window.Capacitor.Plugins[name] : null);
+window.gameAudio = {
+  suspend() { if (AC && AC.state === 'running') AC.suspend(); },
+  resume() { if (AC && AC.state === 'suspended' && !paused) AC.resume(); },
+};
+const inPlay = () => state !== 'title' && state !== 'end';
+function setPaused(p) {
+  if (p === paused || (p && !inPlay())) return;
+  paused = p;
+  if (p) { pauseStart = performance.now(); window.gameAudio.suspend(); }
+  else { pauseOffset += performance.now() - pauseStart; window.gameAudio.resume(); }
+  document.getElementById('pause').classList.toggle('hidden', !p);
+}
+document.getElementById('pause').addEventListener('pointerdown', e => { e.preventDefault(); setPaused(false); });
+// 別のアプリに切り替えたら一時停止して音を止める
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { setPaused(true); window.gameAudio.suspend(); }
+  else window.gameAudio.resume();
+});
+// Android の戻るボタン：プレイ中はポーズ切替、タイトル・結果画面ではアプリを閉じる
+if (plugin('App')) {
+  plugin('App').addListener('backButton', () => {
+    if (!inPlay()) plugin('App').exitApp();
+    else setPaused(!paused);
+  });
+}
+// どのビルドが入っているか分かるよう、アプリ版はタイトル画面にバージョンを出す
+if (window.APP_VERSION && window.APP_VERSION !== 'dev') document.getElementById('buildInfo').textContent = window.APP_VERSION;
+// EU など同意が必要な地域では、タイトル画面から広告の同意内容を変更できるようにする
+ads.initDone.then(() => { if (ads.privacyOptionsRequired) document.getElementById('adPrivacy').classList.remove('hidden'); });
+document.getElementById('adPrivacyLink').addEventListener('click', e => { e.preventDefault(); ads.showPrivacyOptions(); });
 
 // ============================================================
 //  HUD
@@ -1438,10 +1511,11 @@ function drawMessages() {
 // ============================================================
 //  メインループ
 // ============================================================
-let last = performance.now();
+let last = clock();
 function frame(t) {
-  now = performance.now();
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (paused) { render(now); requestAnimationFrame(frame); return; }
+  now = clock();
+  const dt = Math.min(0.05, Math.max(0, now - last) / 1000); last = now;
   update(dt);
   render(now);
   requestAnimationFrame(frame);
@@ -1562,7 +1636,19 @@ document.getElementById('latAuto').addEventListener('change', e => { calib.auto 
 saveCalib();
 document.getElementById('shareBtn').addEventListener('click', shareResult);
 document.getElementById('shareCopy').addEventListener('click', copyResult);
-document.getElementById('again').addEventListener('click', () => { initAudio(); startGame(levelKey); });
+// 2 回に 1 回、「もう一度」の前に全画面広告を出す（Android アプリのみ）
+let retries = 0, retryBusy = false;
+document.getElementById('again').addEventListener('click', async () => {
+  if (retryBusy) return;
+  initAudio();
+  retries++;
+  if (ads.available && retries % 2 === 0) {
+    retryBusy = true;
+    await ads.showInterstitial();
+    retryBusy = false;
+  }
+  startGame(levelKey);
+});
 document.getElementById('toTitle').addEventListener('click', () => {
   document.getElementById('end').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
