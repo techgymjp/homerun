@@ -11,6 +11,10 @@
 
   ![APK のダウンロード用 QR コード](apk-qr.png)
 
+  APK の直接ダウンロードが止まる場合は、Release のページ（`https://github.com/techgymjp/homerun/releases/tag/android-latest`）を開いて「Assets」の homerun.apk をタップする
+
+  ![Release ページの QR コード](release-page-qr.png)
+
 ## アプリ版だけの動き
 
 | 機能 | 内容 |
