@@ -1,0 +1,41 @@
+Homerun Challenge - Google Play store listing (English / en-US)
+Note: the in-game text is Japanese only.
+
+[App name] (max 30 characters)
+Homerun Challenge 160km/h
+
+[Short description] (max 80 characters)
+Hit 100 pitches — 160km/h fastballs and nasty breaking balls. Tap to swing!
+
+[Full description] (max 4000 characters)
+Can you hit a 160 km/h fastball?
+
+The pitcher throws 100 pitches. Your job: knock them out of the park.
+Tap the spot where the ball will cross the plate, at exactly the right moment. Square it up and the ball soars into the night sky — clear the fence and the crowd erupts with cheers and fireworks.
+
+■ PITCHES THAT KEEP YOU GUESSING
+• Fastballs up to 163 km/h (101 mph)
+• Sliders, curveballs, shuuto (screwballs), forkballs and slow balls
+• Breaking balls that snap late — but every pitch is a strike
+• The pitcher changes his rhythm every time, with the occasional quick pitch
+
+■ PHYSICS-BASED HITTING
+• Swing early to pull the ball, late to go the other way
+• Hit just under the ball to lift it, over it for a grounder
+• Distance is calculated from exit speed, launch angle and direction
+• After every pitch you see where the ball crossed, where you tapped, and how many milliseconds early or late you were
+
+■ BALLPARK ATMOSPHERE
+• Night game with trumpet-and-drum cheering and the whoosh of every pitch
+• Groans when you whiff, cheers and fireworks when you go deep
+• Your phone vibrates on contact
+
+■ EASY TO PLAY
+• Three levels: 160km/h (real speed), Pro and Rookie
+• Automatic timing calibration for your phone's screen and touch delay
+• Earn a title based on home runs, hits, batting average and longest drive
+• Share your results to X, LINE and more
+• Watch an ad after the game for 10 bonus pitches in extra innings
+• Plays offline (ads and sharing need a connection)
+
+How many can you hit out of 100? Step up to the plate.

@@ -29,7 +29,7 @@
 
 1. ~~AdMob：アプリの追加・インタースティシャルの広告ユニット作成~~（済み。インタースティシャルとリワードの広告ユニットを作成し、ID は `strings.xml` の `admob_app_id` と `js/ads.js` の `UNITS.production` に設定済み）。「欧州の規制」のメッセージへの追加も済み
 2. **GitHub Secrets**（Settings → Secrets and variables → Actions）：`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`。登録すると、Actions が署名付き AAB を作って Artifact に上げます
-3. **Play Console**：アプリを作成し、ストア掲載情報・アプリのコンテンツ（プライバシーポリシー https://techgym.jp/privacy-policy/ 、広告あり、広告 ID 使用など）を入力して、AAB をアップロードする
+3. **Play Console**：ストア掲載情報の下書きと画像は [docs/store/listing.md](store/listing.md)（アプリ名「ホームラン競争 〜体感160km/h〜」、パッケージ名 `jp.techgym.homerun`）。アプリを作成し、ストア掲載情報・アプリのコンテンツ（プライバシーポリシー https://techgym.jp/privacy-policy/ 、広告あり、広告 ID 使用など）を入力して、AAB をアップロードする
 
 アップロード鍵（upload.jks）とパスワードは、チャットやリポジトリで共有しないでください。本番の広告を自分でタップしないでください（動作確認はテスト広告の APK で行う）。
 
