@@ -57,6 +57,8 @@
   .btn.extra:disabled { opacity: .6; }
   .shareRow { display: flex; gap: 8px; justify-content: center; margin: -2px 0 6px; }
   .shareRow .sbtn { flex: 1; text-decoration: none; text-align: center; cursor: pointer; }
+  /* 試合終了画面：下に出るバナー広告とボタンが重ならないよう余白を空ける */
+  #end { padding-bottom: calc(16px + var(--banner-h, 0px)); }
   .legal { text-align: center; font-size: 12px; color: #8fa0c8; margin: 12px 0 0; }
   .legal a { color: #9fd8ff; }
   .legal #buildInfo { margin-right: 8px; }
@@ -886,6 +888,7 @@ function endGame() {
   ex.disabled = false;
   document.getElementById('extraMsg').textContent = `あと${EXTRA_PITCHES}球打てます（1試合1回）`;
   document.getElementById('end').classList.remove('hidden');
+  ads.showBanner();   // 試合終了画面の下にバナー（Android アプリのみ）
 }
 
 // ============================================================
@@ -1660,10 +1663,12 @@ document.getElementById('extraBtn').addEventListener('click', async () => {
   extraBusy = true;
   const btn = document.getElementById('extraBtn'), note = document.getElementById('extraMsg');
   btn.disabled = true; note.textContent = '広告を読み込み中…';
+  ads.hideBanner();
   const result = await ads.showRewarded();
   extraBusy = false;
   if (state !== 'end') return;
   if (result !== 'rewarded') {
+    ads.showBanner();
     btn.disabled = false;
     note.textContent = result === 'skipped' ? '最後まで見ると延長戦になります' : '広告を読み込めませんでした。少し待ってもう一度お試しください';
     return;
@@ -1678,13 +1683,13 @@ document.getElementById('extraBtn').addEventListener('click', async () => {
   bandStart();
 });
 
-// 2 回に 1 回、「もう一度」の前に全画面広告を出す（Android アプリのみ）
-let retries = 0, retryBusy = false;
+// 「もう一度」の前に毎回、全画面広告を出す（Android アプリのみ）
+let retryBusy = false;
 document.getElementById('again').addEventListener('click', async () => {
   if (retryBusy) return;
   initAudio();
-  retries++;
-  if (ads.available && retries % 2 === 0) {
+  ads.hideBanner();
+  if (ads.available) {
     retryBusy = true;
     await ads.showInterstitial();
     retryBusy = false;
@@ -1692,6 +1697,7 @@ document.getElementById('again').addEventListener('click', async () => {
   startGame(levelKey);
 });
 document.getElementById('toTitle').addEventListener('click', () => {
+  ads.hideBanner();
   document.getElementById('end').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
   state = 'title';

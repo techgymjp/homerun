@@ -84,6 +84,7 @@ const Ads = (() => {
     AdMob.addListener('onRewardedVideoAdReward', () => { rewarded = true; });
     AdMob.addListener('onRewardedVideoAdDismissed', () => finish('reward', rewarded));
     AdMob.addListener('onRewardedVideoAdFailedToShow', () => finish('reward', false));
+    AdMob.addListener('bannerAdSizeChanged', size => { if (bannerOn) setBannerHeight(size && size.height); });
     prepare('inter');
     prepare('reward');
   }
@@ -112,8 +113,10 @@ const Ads = (() => {
     });
   }
 
-  // ポーズ画面の下にバナーを出す（再開したら消す）
+  // 画面の下にバナーを出す（ポーズ画面・試合終了画面）。
+  // バナーの高さを CSS 変数 --banner-h に入れ、ボタンがバナーに重ならないよう余白を空ける
   let bannerOn = false;
+  const setBannerHeight = h => document.documentElement.style.setProperty('--banner-h', (h || 0) + 'px');
   async function showBanner() {
     if (!AdMob || !ids.banner || bannerOn) return;
     await initDone;
@@ -125,6 +128,7 @@ const Ads = (() => {
   function hideBanner() {
     if (!AdMob || !bannerOn) return;
     bannerOn = false;
+    setBannerHeight(0);
     AdMob.removeBanner().catch(() => {});
   }
 
