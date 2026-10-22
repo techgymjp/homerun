@@ -53,6 +53,8 @@
   .calib small { display: block; color: #b9c6e8; font-size: 11px; }
   .sbtn { font: inherit; font-weight: 800; font-size: 15px; padding: 6px 14px; border-radius: 10px; border: 0; background: #dfe7f7; color: #1b2440; }
   .btn.share { background: linear-gradient(#7fe3ff, #2f9bff); color: #031a33; box-shadow: 0 4px 0 #11589b, 0 8px 18px rgba(0,0,0,.4); }
+  .btn.extra { background: linear-gradient(#b8ff9a, #3fcf5a); color: #052a0c; box-shadow: 0 4px 0 #1f7a30, 0 8px 18px rgba(0,0,0,.4); }
+  .btn.extra:disabled { opacity: .6; }
   .shareRow { display: flex; gap: 8px; justify-content: center; margin: -2px 0 6px; }
   .shareRow .sbtn { flex: 1; text-decoration: none; text-align: center; cursor: pointer; }
   .legal { text-align: center; font-size: 12px; color: #8fa0c8; margin: 12px 0 0; }
@@ -66,7 +68,7 @@
 <canvas id="c"></canvas>
 
 <div id="hud" class="hidden">
-  <div class="box"><span class="lbl">投球</span><span id="hPitch">0</span> / 100</div>
+  <div class="box"><span class="lbl">投球</span><span id="hPitch">0</span> / <span id="hTotal">100</span></div>
   <div class="box" id="board"><span class="lbl" id="hType">―</span><span class="spd" id="hSpeed">― km/h</span></div>
   <div class="box" style="text-align:right"><span class="lbl">ホームラン</span><span class="big" id="hHr">0</span> <span style="font-size:12px;color:#b9c6e8">安打 <span id="hHit">0</span></span><span style="display:block;font-size:12px;color:#b9c6e8">打率 <span id="hAvg" style="color:#fff;font-size:15px">.000</span></span></div>
 </div>
@@ -113,6 +115,7 @@
       <div class="stat"><b id="eLong">0m</b><span>最長飛距離</span></div>
       <div class="stat"><b id="eJust">0</b><span>ジャストミート</span></div>
     </div>
+    <button class="btn extra hidden" id="extraBtn">🎬 広告を見て延長戦<small id="extraMsg">あと10球打てます（1試合1回）</small></button>
     <button class="btn share" id="shareBtn">📤 結果をシェア<small id="shareMsg">成績画像つきでシェアできます</small></button>
     <div class="shareRow">
       <a class="sbtn" id="shareX" target="_blank" rel="noopener">𝕏 ポスト</a>
@@ -144,6 +147,8 @@ const ctx = cv.getContext('2d');
 let W, H, DPR, F0, CX, CY;
 
 const TOTAL_PITCHES = 100;
+const EXTRA_PITCHES = 10;     // リワード広告を見たときの延長戦の球数
+let totalPitches = TOTAL_PITCHES, extended = false;
 const ZONE = { x0: -0.215, x1: 0.215, y0: 0.50, y1: 1.05 }; // ストライクゾーン（m）
 const BALL_R = 0.037;
 const REL = { x: -0.38, y: 1.85, z: 17.0 };                   // リリースポイント
@@ -627,6 +632,7 @@ function formatAvg(h, ab) {
 function startGame(key) {
   levelKey = key; level = LEVELS[key];
   resetStats(); pitchNo = 0;
+  totalPitches = TOTAL_PITCHES; extended = false;
   document.getElementById('title').classList.add('hidden');
   document.getElementById('end').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
@@ -667,7 +673,7 @@ function releasePitch() {
   const type = choosePitch();
   // 後半ほどストレートが速くなる
   let kmh = rand(type.v[0], type.v[1]);
-  if (type.name === 'ストレート') kmh = Math.min(type.v[1], kmh + pitchNo / TOTAL_PITCHES * 4);
+  if (type.name === 'ストレート') kmh = Math.min(type.v[1], kmh + Math.min(1, pitchNo / TOTAL_PITCHES) * 4);
   kmh = Math.round(kmh);
   const v = kmh / 3.6 * level.speedMul;
   const T = (REL.z / v) * 1.05; // 空気抵抗でわずかに減速
@@ -854,7 +860,7 @@ function finishPitchNoHit() {
 function nextPitch() {
   stats.ab = pitchNo;
   updateHud();
-  if (pitchNo >= TOTAL_PITCHES) { endGame(); return; }
+  if (pitchNo >= totalPitches) { endGame(); return; }
   toReady(700);
 }
 
@@ -870,9 +876,14 @@ function endGame() {
   document.getElementById('eJust').textContent = stats.just;
   const h = stats.hr;
   const rank = h >= 50 ? '伝説のスラッガー' : h >= 30 ? 'ホームラン王' : h >= 15 ? '4番バッター' : h >= 5 ? '高校球児' : h >= 1 ? '草野球の星' : '修行が必要…';
-  document.getElementById('eRank').textContent = level.name + '：' + rank;
-  lastResult = { level: level.name, rank, hr: stats.hr, hits: totalHits(), ab: stats.ab, avg: formatAvg(totalHits(), stats.ab), longest: stats.longest };
+  document.getElementById('eRank').textContent = level.name + '：' + rank + (extended ? '（延長戦込み）' : '');
+  lastResult = { extended, level: level.name, rank, hr: stats.hr, hits: totalHits(), ab: stats.ab, avg: formatAvg(totalHits(), stats.ab), longest: stats.longest };
   prepareShare();
+  // 延長戦（リワード広告）は Android アプリで 1 試合 1 回だけ
+  const ex = document.getElementById('extraBtn');
+  ex.classList.toggle('hidden', extended || !ads.rewardedAvailable);
+  ex.disabled = false;
+  document.getElementById('extraMsg').textContent = `あと${EXTRA_PITCHES}球打てます（1試合1回）`;
   document.getElementById('end').classList.remove('hidden');
 }
 
@@ -885,7 +896,7 @@ const SHARE_URL = 'https://techgym.jp/column/claude-code-game-homerun/';   // �
 const shareUrl = () => SHARE_URL;
 function shareText() {
   const r = lastResult;
-  return `⚾ホームラン競争【${r.level}】で${r.hr}本塁打！\n打率${r.avg}（${r.hits}安打/${r.ab}打数）・最長${r.longest}m\n称号：${r.rank}\n#ホームラン競争 #体感160km`;
+  return `⚾ホームラン競争【${r.level}】で${r.hr}本塁打！${r.extended ? '（延長戦込み）' : ''}\n打率${r.avg}（${r.hits}安打/${r.ab}打数）・最長${r.longest}m\n称号：${r.rank}\n#ホームラン競争 #体感160km`;
 }
 function prepareShare() {
   const text = shareText(), url = shareUrl();
@@ -916,7 +927,7 @@ function makeShareImage() {
   const gold = g.createLinearGradient(0, 120, 0, 280);
   gold.addColorStop(0, '#fff6c4'); gold.addColorStop(0.5, '#ffd000'); gold.addColorStop(1, '#ff8a00');
   g.fillStyle = gold; g.font = font(900, 150); g.fillText(`${r.hr}本塁打`, 600, 200);
-  g.fillStyle = '#ff9d3c'; g.font = font(900, 52); g.fillText(`称号：${r.rank}`, 600, 330);
+  g.fillStyle = '#ff9d3c'; g.font = font(900, 52); g.fillText(`称号：${r.rank}${r.extended ? '（延長戦込み）' : ''}`, 600, 330);
   g.fillStyle = '#ffffff'; g.font = font(800, 44);
   g.fillText(`打率 ${r.avg}（${r.hits}安打 / ${r.ab}打数）`, 600, 420);
   g.fillText(`最長飛距離 ${r.longest}m`, 600, 490);
@@ -966,6 +977,7 @@ async function copyResult() {
 // js/ads.js が無い（index.html 単体で開いた）場合でも動くよう、広告は何もしない代用品に差し替える
 const ads = typeof Ads !== 'undefined' ? Ads : {
   available: false, privacyOptionsRequired: false, initDone: Promise.resolve(),
+  rewardedAvailable: false, showRewarded: () => Promise.resolve('unavailable'),
   showInterstitial: () => Promise.resolve(), showPrivacyOptions: () => Promise.resolve(),
 };
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -1007,6 +1019,7 @@ document.getElementById('adPrivacyLink').addEventListener('click', e => { e.prev
 const $ = id => document.getElementById(id);
 function updateHud() {
   $('hPitch').textContent = pitchNo;
+  $('hTotal').textContent = totalPitches;
   $('hHr').textContent = stats.hr;
   $('hHit').textContent = totalHits();
   $('hAvg').textContent = formatAvg(totalHits(), stats.ab);
@@ -1636,6 +1649,31 @@ document.getElementById('latAuto').addEventListener('change', e => { calib.auto 
 saveCalib();
 document.getElementById('shareBtn').addEventListener('click', shareResult);
 document.getElementById('shareCopy').addEventListener('click', copyResult);
+// 延長戦：リワード広告を最後まで見たら、成績を引き継いで 10 球追加で打てる
+let extraBusy = false;
+document.getElementById('extraBtn').addEventListener('click', async () => {
+  if (extraBusy || extended || state !== 'end') return;
+  extraBusy = true;
+  const btn = document.getElementById('extraBtn'), note = document.getElementById('extraMsg');
+  btn.disabled = true; note.textContent = '広告を読み込み中…';
+  const result = await ads.showRewarded();
+  extraBusy = false;
+  if (state !== 'end') return;
+  if (result !== 'rewarded') {
+    btn.disabled = false;
+    note.textContent = result === 'skipped' ? '最後まで見ると延長戦になります' : '広告を読み込めませんでした。少し待ってもう一度お試しください';
+    return;
+  }
+  extended = true; totalPitches = TOTAL_PITCHES + EXTRA_PITCHES;
+  initAudio();
+  document.getElementById('end').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  updateHud();
+  msg = { text: '延長戦！', sub: `あと${EXTRA_PITCHES}球`, color: '#7dff9a', t: now };
+  toReady(1500);
+  bandStart();
+});
+
 // 2 回に 1 回、「もう一度」の前に全画面広告を出す（Android アプリのみ）
 let retries = 0, retryBusy = false;
 document.getElementById('again').addEventListener('click', async () => {

@@ -5,9 +5,11 @@ const Ads = (() => {
     // Google 公式のテスト用広告ユニット
     test: {
       interstitial: 'ca-app-pub-3940256099942544/1033173712',
+      rewarded: 'ca-app-pub-3940256099942544/5224354917',
     },
     production: {
       interstitial: 'ca-app-pub-6411535997477460/6340416671',
+      rewarded: 'ca-app-pub-6411535997477460/1849014036',
     },
   };
   const RETRY_MS = 20000;      // 読み込みに失敗したら少し待って再挑戦する
@@ -15,33 +17,46 @@ const Ads = (() => {
   const native = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
   const testing = window.AD_MODE !== 'production';
   const ids = testing ? UNITS.test : UNITS.production;
-  const AdMob = native && cap.Plugins && ids.interstitial ? cap.Plugins.AdMob : null;
+  const AdMob = native && cap.Plugins ? cap.Plugins.AdMob : null;
 
   let ready = false;           // 広告をリクエストしてよい状態（初期化と同意確認が済んだ）
   let showing = false;
   let privacyRequired = false; // 「広告の設定」を利用者が開けるようにする必要があるか（EU など）
-  let onClosed = null;         // 表示中の広告が閉じたときに呼ぶ処理
-  const inter = { loaded: false, pending: null };
+  const waiters = {};          // 表示中の広告が閉じたときに呼ぶ処理
+
+  // 広告の種類ごとの読み込み状態（ID が空の種類は使わない）
+  const slots = {
+    inter: { id: ids.interstitial, loaded: false, pending: null, load: () => AdMob.prepareInterstitial({ adId: ids.interstitial, isTesting: testing }) },
+    reward: { id: ids.rewarded, loaded: false, pending: null, load: () => AdMob.prepareRewardVideoAd({ adId: ids.rewarded, isTesting: testing }) },
+  };
+  const usable = kind => !!(AdMob && slots[kind].id);
 
   // 読み込みを始め、読み込めたら true で resolve する Promise を返す（読み込み中なら同じ Promise）
-  function prepare() {
-    if (!ready) return Promise.resolve(false);
-    if (inter.loaded) return Promise.resolve(true);
-    if (!inter.pending) {
-      inter.pending = AdMob.prepareInterstitial({ adId: ids.interstitial, isTesting: testing })
-        .then(() => { inter.loaded = true; return true; })
-        .catch(() => { setTimeout(prepare, RETRY_MS); return false; })
-        .finally(() => { inter.pending = null; });
+  function prepare(kind) {
+    const s = slots[kind];
+    if (!ready || !usable(kind)) return Promise.resolve(false);
+    if (s.loaded) return Promise.resolve(true);
+    if (!s.pending) {
+      s.pending = s.load()
+        .then(() => { s.loaded = true; return true; })
+        .catch(() => { setTimeout(() => prepare(kind), RETRY_MS); return false; })
+        .finally(() => { s.pending = null; });
     }
-    return inter.pending;
+    return s.pending;
   }
 
-  function finish() {
+  // 読み込み済みでなければ、最大 timeout ミリ秒だけ読み込みを待つ
+  function ensureLoaded(kind, timeout) {
+    if (slots[kind].loaded) return Promise.resolve(true);
+    return Promise.race([prepare(kind), new Promise(r => setTimeout(() => r(false), timeout))]);
+  }
+
+  function finish(kind, result) {
     showing = false;
     if (window.gameAudio) window.gameAudio.resume();
-    const cb = onClosed;
-    onClosed = null;
-    if (cb) cb();
+    const w = waiters[kind];
+    waiters[kind] = null;
+    if (w) w(result);
   }
 
   async function init() {
@@ -60,19 +75,38 @@ const Ads = (() => {
     } catch (e) {
       ready = true;
     }
-    AdMob.addListener('interstitialAdDismissed', finish);
-    AdMob.addListener('interstitialAdFailedToShow', finish);
-    prepare();
+    let rewarded = false;
+    AdMob.addListener('interstitialAdDismissed', () => finish('inter'));
+    AdMob.addListener('interstitialAdFailedToShow', () => finish('inter'));
+    AdMob.addListener('onRewardedVideoAdShowed', () => { rewarded = false; });
+    AdMob.addListener('onRewardedVideoAdReward', () => { rewarded = true; });
+    AdMob.addListener('onRewardedVideoAdDismissed', () => finish('reward', rewarded));
+    AdMob.addListener('onRewardedVideoAdFailedToShow', () => finish('reward', false));
+    prepare('inter');
+    prepare('reward');
   }
 
   // 全画面広告を表示し、閉じられたら resolve する（読み込めていないときは出さずにすぐ resolve）
   function showInterstitial() {
-    if (!AdMob || !ready || !inter.loaded || showing) return Promise.resolve();
-    showing = true; inter.loaded = false;
+    if (!usable('inter') || !ready || !slots.inter.loaded || showing) return Promise.resolve();
+    showing = true; slots.inter.loaded = false;
     if (window.gameAudio) window.gameAudio.suspend();
     return new Promise(resolve => {
-      onClosed = () => { prepare(); resolve(); };
-      AdMob.showInterstitial().catch(finish);
+      waiters.inter = () => { prepare('inter'); resolve(); };
+      AdMob.showInterstitial().catch(() => finish('inter'));
+    });
+  }
+
+  // リワード広告を表示する。結果は 'rewarded'（最後まで見た）/ 'skipped'（途中で閉じた）/ 'unavailable'（読み込めなかった）
+  async function showRewarded() {
+    if (!usable('reward') || showing) return 'unavailable';
+    await initDone;
+    if (!ready || !(await ensureLoaded('reward', 8000))) return 'unavailable';
+    showing = true; slots.reward.loaded = false;
+    if (window.gameAudio) window.gameAudio.suspend();
+    return new Promise(resolve => {
+      waiters.reward = ok => { prepare('reward'); resolve(ok ? 'rewarded' : 'skipped'); };
+      AdMob.showRewardVideoAd().catch(() => finish('reward', false));
     });
   }
 
@@ -85,11 +119,13 @@ const Ads = (() => {
   const initDone = AdMob ? init() : Promise.resolve();
 
   return {
-    get available() { return !!AdMob; },
+    get available() { return usable('inter'); },
+    get rewardedAvailable() { return usable('reward'); },
     get showing() { return showing; },
     get privacyOptionsRequired() { return privacyRequired; },
     initDone,
     showInterstitial,
+    showRewarded,
     showPrivacyOptions,
   };
 })();

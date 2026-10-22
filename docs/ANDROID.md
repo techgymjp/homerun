@@ -4,7 +4,7 @@
 
 - パッケージ名：`jp.techgym.homerun`（Google Play に一度出すと変更できません）
 - 画面の向き：縦（`sensorPortrait`）
-- 広告：「もう一度」を押したとき 2 回に 1 回、インタースティシャル広告。バナーとリワード広告はなし。動作確認用 APK はテスト広告、Google Play 用 AAB だけ本番の広告
+- 広告：「もう一度」を押したとき 2 回に 1 回、インタースティシャル広告。試合終了画面の「広告を見て延長戦」でリワード広告（見終わると＋10球、1 試合 1 回）。バナーはなし。動作確認用 APK はテスト広告、Google Play 用 AAB だけ本番の広告
 - 動作確認用 APK（テスト広告・デバッグ署名）：既定ブランチに push すると GitHub Actions がビルドし、Release `android-latest` に載せます
 
   `https://github.com/techgymjp/homerun/releases/latest/download/homerun.apk`
@@ -23,7 +23,7 @@
 
 ## これからやること（画面での手続き）
 
-1. ~~AdMob：アプリの追加・インタースティシャルの広告ユニット作成~~（済み。ID は `strings.xml` の `admob_app_id` と `js/ads.js` の `UNITS.production` に設定済み）。「欧州の規制」のメッセージにこのアプリを対象として追加したかも確認する
+1. ~~AdMob：アプリの追加・インタースティシャルの広告ユニット作成~~（済み。インタースティシャルとリワードの広告ユニットを作成し、ID は `strings.xml` の `admob_app_id` と `js/ads.js` の `UNITS.production` に設定済み）。「欧州の規制」のメッセージにこのアプリを対象として追加したかも確認する
 2. **GitHub Secrets**（Settings → Secrets and variables → Actions）：`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`。登録すると、Actions が署名付き AAB を作って Artifact に上げます
 3. **Play Console**：アプリを作成し、ストア掲載情報・アプリのコンテンツ（プライバシーポリシー https://techgym.jp/privacy-policy/ 、広告あり、広告 ID 使用など）を入力して、AAB をアップロードする
 
