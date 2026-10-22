@@ -6,10 +6,8 @@ const Ads = (() => {
     test: {
       interstitial: 'ca-app-pub-3940256099942544/1033173712',
     },
-    // TODO: AdMob でインタースティシャルの広告ユニットを作ったら ID を入れる。
-    // 空のままなら Google Play 版（本番モード）では広告を出さない
     production: {
-      interstitial: '',
+      interstitial: 'ca-app-pub-6411535997477460/6340416671',
     },
   };
   const RETRY_MS = 20000;      // 読み込みに失敗したら少し待って再挑戦する
