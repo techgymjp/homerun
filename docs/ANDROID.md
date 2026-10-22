@@ -6,14 +6,13 @@
 - 画面の向き：縦（`sensorPortrait`）
 - 広告：「もう一度」を押したとき 2 回に 1 回、インタースティシャル広告。試合終了画面の「広告を見て延長戦」でリワード広告（見終わると＋10球、1 試合 1 回）。バナーはなし。動作確認用 APK はテスト広告、Google Play 用 AAB だけ本番の広告
 - 動作確認用 APK（テスト広告・デバッグ署名）：既定ブランチに push すると GitHub Actions がビルドし、Release `android-latest` に載せます
+- スマホへの入れ方：下の QR コードで Release のページを開き、「Assets」の homerun.apk をタップする（ページが開いたら Chrome で表示する）
 
-  `https://github.com/techgymjp/homerun/releases/latest/download/homerun.apk`
-
-  ![APK のダウンロード用 QR コード](apk-qr.png)
-
-  APK の直接ダウンロードが止まる場合は、Release のページ（`https://github.com/techgymjp/homerun/releases/tag/android-latest`）を開いて「Assets」の homerun.apk をタップする
+  `https://github.com/techgymjp/homerun/releases/tag/android-latest`
 
   ![Release ページの QR コード](release-page-qr.png)
+
+  ファイルを直接ダウンロードする URL（`https://github.com/techgymjp/homerun/releases/latest/download/homerun.apk`、QR は [apk-qr.png](apk-qr.png)）は、端末によっては「ダウンロードしています」のまま止まることがありました（AQUOS で発生。Release のページからなら入れられた）
 
 ## アプリ版だけの動き
 
