@@ -6,10 +6,12 @@ const Ads = (() => {
     test: {
       interstitial: 'ca-app-pub-3940256099942544/1033173712',
       rewarded: 'ca-app-pub-3940256099942544/5224354917',
+      banner: 'ca-app-pub-3940256099942544/9214589741',
     },
     production: {
       interstitial: 'ca-app-pub-6411535997477460/6340416671',
       rewarded: 'ca-app-pub-6411535997477460/1849014036',
+      banner: 'ca-app-pub-6411535997477460/5185623819',
     },
   };
   const RETRY_MS = 20000;      // 読み込みに失敗したら少し待って再挑戦する
@@ -110,6 +112,22 @@ const Ads = (() => {
     });
   }
 
+  // ポーズ画面の下にバナーを出す（再開したら消す）
+  let bannerOn = false;
+  async function showBanner() {
+    if (!AdMob || !ids.banner || bannerOn) return;
+    await initDone;
+    if (!ready) return;
+    bannerOn = true;
+    AdMob.showBanner({ adId: ids.banner, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: testing })
+      .catch(() => { bannerOn = false; });
+  }
+  function hideBanner() {
+    if (!AdMob || !bannerOn) return;
+    bannerOn = false;
+    AdMob.removeBanner().catch(() => {});
+  }
+
   // 同意した内容をあとから変更するための Google のフォームを開く
   function showPrivacyOptions() {
     if (!AdMob) return Promise.resolve();
@@ -126,6 +144,8 @@ const Ads = (() => {
     initDone,
     showInterstitial,
     showRewarded,
+    showBanner,
+    hideBanner,
     showPrivacyOptions,
   };
 })();

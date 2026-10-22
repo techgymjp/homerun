@@ -60,7 +60,8 @@
   .legal { text-align: center; font-size: 12px; color: #8fa0c8; margin: 12px 0 0; }
   .legal a { color: #9fd8ff; }
   .legal #buildInfo { margin-right: 8px; }
-  #pause { z-index: 20; cursor: pointer; }
+  #pause { z-index: 20; }
+  #pause .panel { margin-top: 30vh; }
   .rank { font-size: 26px; font-weight: 900; color: #ff9d3c; margin: 6px 0; }
 </style>
 </head>
@@ -130,7 +131,7 @@
 <div id="pause" class="overlay hidden">
   <div class="panel">
     <h1>一時停止中</h1>
-    <p style="text-align:center">画面をタップすると再開します</p>
+    <button class="btn" id="resumeBtn" style="margin-top:18px">▶ 再開</button>
   </div>
 </div>
 
@@ -707,7 +708,7 @@ function ballPos(p, t) {
 cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   initAudio();
-  if (paused) { setPaused(false); return; }
+  if (paused) return;   // 再開は「再開」ボタンで
   const real = (e.timeStamp && Math.abs(e.timeStamp - performance.now()) < 200) ? e.timeStamp : performance.now();
   onTap(e.clientX, e.clientY, real - pauseOffset);
 }, { passive: false });
@@ -978,6 +979,7 @@ async function copyResult() {
 const ads = typeof Ads !== 'undefined' ? Ads : {
   available: false, privacyOptionsRequired: false, initDone: Promise.resolve(),
   rewardedAvailable: false, showRewarded: () => Promise.resolve('unavailable'),
+  showBanner: () => {}, hideBanner: () => {},
   showInterstitial: () => Promise.resolve(), showPrivacyOptions: () => Promise.resolve(),
 };
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -990,11 +992,13 @@ const inPlay = () => state !== 'title' && state !== 'end';
 function setPaused(p) {
   if (p === paused || (p && !inPlay())) return;
   paused = p;
-  if (p) { pauseStart = performance.now(); window.gameAudio.suspend(); }
-  else { pauseOffset += performance.now() - pauseStart; window.gameAudio.resume(); }
+  // ポーズ中だけ画面下にバナー広告（Android アプリのみ）
+  if (p) { pauseStart = performance.now(); window.gameAudio.suspend(); ads.showBanner(); }
+  else { pauseOffset += performance.now() - pauseStart; window.gameAudio.resume(); ads.hideBanner(); }
   document.getElementById('pause').classList.toggle('hidden', !p);
 }
-document.getElementById('pause').addEventListener('pointerdown', e => { e.preventDefault(); setPaused(false); });
+// 再開はボタンだけ（画面のどこでも再開にすると、下のバナー広告を誤ってタップしやすいため）
+document.getElementById('resumeBtn').addEventListener('click', () => setPaused(false));
 // 別のアプリに切り替えたら一時停止して音を止める
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { setPaused(true); window.gameAudio.suspend(); }
