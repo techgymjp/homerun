@@ -23,7 +23,7 @@
 
 ## これからやること（画面での手続き）
 
-1. ~~AdMob：アプリの追加・インタースティシャルの広告ユニット作成~~（済み。インタースティシャルとリワードの広告ユニットを作成し、ID は `strings.xml` の `admob_app_id` と `js/ads.js` の `UNITS.production` に設定済み）。「欧州の規制」のメッセージにこのアプリを対象として追加したかも確認する
+1. ~~AdMob：アプリの追加・インタースティシャルの広告ユニット作成~~（済み。インタースティシャルとリワードの広告ユニットを作成し、ID は `strings.xml` の `admob_app_id` と `js/ads.js` の `UNITS.production` に設定済み）。「欧州の規制」のメッセージへの追加も済み
 2. **GitHub Secrets**（Settings → Secrets and variables → Actions）：`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`。登録すると、Actions が署名付き AAB を作って Artifact に上げます
 3. **Play Console**：アプリを作成し、ストア掲載情報・アプリのコンテンツ（プライバシーポリシー https://techgym.jp/privacy-policy/ 、広告あり、広告 ID 使用など）を入力して、AAB をアップロードする
 
