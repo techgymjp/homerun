@@ -1,5 +1,5 @@
 Homerun Challenge - Google Play store listing (English / en-US)
-Note: the in-game text is Japanese only.
+Screenshots: en-1-pitch.png ~ en-4-result.png / Feature graphic: feature-graphic-en.png
 
 [App name] (max 30 characters)
 Homerun Challenge 160km/h
@@ -37,5 +37,6 @@ Tap the spot where the ball will cross the plate, at exactly the right moment. S
 • Share your results to X, LINE and more
 • Watch an ad after the game for 10 bonus pitches in extra innings
 • Plays offline (ads and sharing need a connection)
+• English and Japanese
 
 How many can you hit out of 100? Step up to the plate.

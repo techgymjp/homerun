@@ -39,7 +39,8 @@ const Ads = (() => {
     if (!ready || !usable(kind)) return Promise.resolve(false);
     if (s.loaded) return Promise.resolve(true);
     if (!s.pending) {
-      s.pending = s.load()
+      // load() がその場で例外を投げても Promise の失敗として扱い、初期化全体を止めない
+      s.pending = Promise.resolve().then(s.load)
         .then(() => { s.loaded = true; return true; })
         .catch(() => { setTimeout(() => prepare(kind), RETRY_MS); return false; })
         .finally(() => { s.pending = null; });
@@ -122,14 +123,18 @@ const Ads = (() => {
     await initDone;
     if (!ready) return;
     bannerOn = true;
-    AdMob.showBanner({ adId: ids.banner, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: testing })
-      .catch(() => { bannerOn = false; });
+    try {
+      await AdMob.showBanner({ adId: ids.banner, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: testing });
+    } catch (e) {
+      bannerOn = false;
+    }
   }
+  // バナーの処理が失敗しても、呼び出し元（延長戦・もう一度など）が止まらないようにする
   function hideBanner() {
     if (!AdMob || !bannerOn) return;
     bannerOn = false;
     setBannerHeight(0);
-    AdMob.removeBanner().catch(() => {});
+    try { Promise.resolve(AdMob.removeBanner()).catch(() => {}); } catch (e) {}
   }
 
   // 同意した内容をあとから変更するための Google のフォームを開く

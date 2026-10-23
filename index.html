@@ -59,11 +59,15 @@
   .shareRow .sbtn { flex: 1; text-decoration: none; text-align: center; cursor: pointer; }
   /* 試合終了画面：下に出るバナー広告とボタンが重ならないよう余白を空ける */
   #end { padding-bottom: calc(16px + var(--banner-h, 0px)); }
+  .panel p.legal { text-align: center; }
   .legal { text-align: center; font-size: 12px; color: #8fa0c8; margin: 12px 0 0; }
   .legal a { color: #9fd8ff; }
   .legal #buildInfo { margin-right: 8px; }
   #pause { z-index: 20; }
   #pause .panel { margin-top: 30vh; }
+  .langRow { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+  .langRow .sbtn { font-size: 13px; padding: 5px 12px; opacity: .55; }
+  .langRow .sbtn.on { opacity: 1; }
   .rank { font-size: clamp(16px, 5.6vw, 26px); font-weight: 900; color: #ff9d3c; margin: 6px 0; line-height: 1.3; }
 </style>
 </head>
@@ -71,69 +75,70 @@
 <canvas id="c"></canvas>
 
 <div id="hud" class="hidden">
-  <div class="box"><span class="lbl">投球</span><span id="hPitch">0</span> / <span id="hTotal">100</span></div>
+  <div class="box"><span class="lbl" data-i18n="hud.pitch">投球</span><span id="hPitch">0</span> / <span id="hTotal">100</span></div>
   <div class="box" id="board"><span class="lbl" id="hType">―</span><span class="spd" id="hSpeed">― km/h</span></div>
-  <div class="box" style="text-align:right"><span class="lbl">ホームラン</span><span class="big" id="hHr">0</span> <span style="font-size:12px;color:#b9c6e8">安打 <span id="hHit">0</span></span><span style="display:block;font-size:12px;color:#b9c6e8">打率 <span id="hAvg" style="color:#fff;font-size:15px">.000</span></span></div>
+  <div class="box" style="text-align:right"><span class="lbl" data-i18n="hud.hr">ホームラン</span><span class="big" id="hHr">0</span> <span style="font-size:12px;color:#b9c6e8"><span data-i18n="hud.hits">安打</span> <span id="hHit">0</span></span><span style="display:block;font-size:12px;color:#b9c6e8"><span data-i18n="hud.avg">打率</span> <span id="hAvg" style="color:#fff;font-size:15px">.000</span></span></div>
 </div>
 
 <div id="title" class="overlay">
   <div class="panel">
-    <h1>ホームラン競争</h1>
-    <div class="sub">― 体感160km/h ―</div>
-    <p>ピッチャーが <b>100球</b> 投げてきます。ボールがホームベースを通過する<b>位置</b>を、<b>ちょうど良いタイミング</b>でタップして打ち返せ！</p>
+    <div class="langRow"><button class="sbtn" data-lang="ja">日本語</button><button class="sbtn" data-lang="en">English</button></div>
+    <h1 data-i18n="title.name">ホームラン競争</h1>
+    <div class="sub" data-i18n="title.sub">― 体感160km/h ―</div>
+    <p data-i18n-html="title.lead">ピッチャーが <b>100球</b> 投げてきます。ボールがホームベースを通過する<b>位置</b>を、<b>ちょうど良いタイミング</b>でタップして打ち返せ！</p>
     <ul>
-      <li>球種：ストレート／スライダー／カーブ／シュート／フォーク／スローボール</li>
-      <li>全球かならずストライクゾーンを通過します</li>
-      <li>タップが早い→引っ張り、遅い→流し打ち。ボールの少し下を叩くと打球が上がります</li>
+      <li data-i18n="title.rule1">球種：ストレート／スライダー／カーブ／シュート／フォーク／スローボール</li>
+      <li data-i18n="title.rule2">全球かならずストライクゾーンを通過します</li>
+      <li data-i18n="title.rule3">タップが早い→引っ張り、遅い→流し打ち。ボールの少し下を叩くと打球が上がります</li>
     </ul>
-    <button class="btn" data-level="legend">体感160km/h<small>実速。最速163km/h・判定シビア（推奨）</small></button>
-    <button class="btn alt" data-level="pro">プロ<small>少し遅め・判定やや甘め</small></button>
-    <button class="btn alt" data-level="rookie">ルーキー<small>練習用。かなり遅め</small></button>
+    <button class="btn" data-level="legend" data-i18n-html="lv.legend.btn">体感160km/h<small>実速。最速163km/h・判定シビア（推奨）</small></button>
+    <button class="btn alt" data-level="pro" data-i18n-html="lv.pro.btn">プロ<small>少し遅め・判定やや甘め</small></button>
+    <button class="btn alt" data-level="rookie" data-i18n-html="lv.rookie.btn">ルーキー<small>練習用。かなり遅め</small></button>
     <div class="calib">
-      <div>タイミング補正 <b id="latV">+0ms</b></div>
+      <div><span data-i18n="calib.title">タイミング補正</span> <b id="latV">+0ms</b></div>
       <div class="row">
         <button id="latMinus" class="sbtn">−10</button>
-        <label><input type="checkbox" id="latAuto" checked> 自動調整</label>
+        <label><input type="checkbox" id="latAuto" checked> <span data-i18n="calib.auto">自動調整</span></label>
         <button id="latPlus" class="sbtn">＋10</button>
       </div>
-      <small>スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ</small>
+      <small data-i18n="calib.note">スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ</small>
     </div>
-    <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px">📳 振動テスト<small id="vibResult">スマホが振動するか確認できます</small></button>
+    <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px"><span data-i18n="vib.btn">📳 振動テスト</span><small id="vibResult" data-i18n="vib.note">スマホが振動するか確認できます</small></button>
     <p class="legal">
       <span id="buildInfo"></span>
-      <a href="https://techgym.jp/privacy-policy/" target="_blank" rel="noopener">プライバシーポリシー</a>
-      <span id="adPrivacy" class="hidden">｜<a href="#" id="adPrivacyLink">広告の設定</a></span>
+      <a href="https://techgym.jp/privacy-policy/" id="privacyLink" target="_blank" rel="noopener" data-i18n="legal.privacy">プライバシーポリシー</a>
+      <span id="adPrivacy" class="hidden">｜<a href="#" id="adPrivacyLink" data-i18n="legal.ads">広告の設定</a></span>
     </p>
   </div>
 </div>
 
 <div id="end" class="overlay hidden">
   <div class="panel">
-    <h1>試合終了</h1>
+    <h1 data-i18n="end.title">試合終了</h1>
     <div class="rank" id="eRank"></div>
     <div class="stats">
-      <div class="stat" style="grid-column:1 / -1"><b id="eAvg">.000</b><span>打率（<span id="eAvgDetail">0安打 / 100打数</span>）</span></div>
-      <div class="stat"><b id="eHr">0</b><span>ホームラン</span></div>
-      <div class="stat"><b id="eHit">0</b><span>安打（本塁打含む）</span></div>
-      <div class="stat"><b id="eLong">0m</b><span>最長飛距離</span></div>
-      <div class="stat"><b id="eJust">0</b><span>ジャストミート</span></div>
+      <div class="stat" style="grid-column:1 / -1"><b id="eAvg">.000</b><span><span data-i18n="end.avg">打率</span><span id="eAvgDetail">（0安打 / 100打数）</span></span></div>
+      <div class="stat"><b id="eHr">0</b><span data-i18n="end.hr">ホームラン</span></div>
+      <div class="stat"><b id="eHit">0</b><span data-i18n="end.hits">安打（本塁打含む）</span></div>
+      <div class="stat"><b id="eLong">0m</b><span data-i18n="end.long">最長飛距離</span></div>
+      <div class="stat"><b id="eJust">0</b><span data-i18n="end.just">ジャストミート</span></div>
     </div>
-    <button class="btn extra hidden" id="extraBtn">🎬 広告を見て延長戦<small id="extraMsg">あと10球打てます（1試合1回）</small></button>
-    <button class="btn share" id="shareBtn">📤 結果をシェア<small id="shareMsg">成績画像つきでシェアできます</small></button>
+    <button class="btn extra hidden" id="extraBtn"><span data-i18n="extra.btn">🎬 広告を見て延長戦</span><small id="extraMsg">あと10球打てます（1試合1回）</small></button>
+    <button class="btn share" id="shareBtn"><span data-i18n="share.btn">📤 結果をシェア</span><small id="shareMsg">成績画像つきでシェアできます</small></button>
     <div class="shareRow">
-      <a class="sbtn" id="shareX" target="_blank" rel="noopener">𝕏 ポスト</a>
+      <a class="sbtn" id="shareX" target="_blank" rel="noopener" data-i18n="share.x">𝕏 ポスト</a>
       <a class="sbtn" id="shareLine" target="_blank" rel="noopener">LINE</a>
-      <button class="sbtn" id="shareCopy">コピー</button>
+      <button class="sbtn" id="shareCopy" data-i18n="share.copy">コピー</button>
     </div>
-    <button class="btn" id="again">もう一度</button>
-    <button class="btn alt" id="toTitle">難易度を選ぶ</button>
+    <button class="btn" id="again" data-i18n="end.again">もう一度</button>
+    <button class="btn alt" id="toTitle" data-i18n="end.toTitle">難易度を選ぶ</button>
   </div>
 </div>
 
 <div id="pause" class="overlay hidden">
   <div class="panel">
-    <h1>一時停止中</h1>
-    <button class="btn" id="resumeBtn" style="margin-top:18px">▶ 再開</button>
+    <h1 data-i18n="pause.title">一時停止中</h1>
+    <button class="btn" id="resumeBtn" style="margin-top:18px" data-i18n="pause.resume">▶ 再開</button>
   </div>
 </div>
 
@@ -159,19 +164,19 @@ const MOUND_Z = 18.44;
 const DRAG = 0.0045;
 
 const LEVELS = {
-  legend: { name: '体感160km/h', speedMul: 1.00, wt: 75,  ws: 0.14 },
-  pro:    { name: 'プロ',         speedMul: 0.86, wt: 95,  ws: 0.17 },
-  rookie: { name: 'ルーキー',     speedMul: 0.68, wt: 130, ws: 0.22 },
+  legend: { speedMul: 1.00, wt: 75,  ws: 0.14 },
+  pro:    { speedMul: 0.86, wt: 95,  ws: 0.17 },
+  rookie: { speedMul: 0.68, wt: 130, ws: 0.22 },
 };
 
 // 球種：加速度(m/s^2)・速度域(km/h)・変化の鋭さ（指数が大きいほど打者の手元で曲がる）
 const PITCHES = [
-  { name: 'ストレート', w: 34, v: [148, 163], a: [-1.2, -1.6], n: 2.0, color: '#ffffff' },
-  { name: 'スライダー', w: 16, v: [128, 140], a: [ 9.5, -7.5], n: 2.6, color: '#7fe3ff' },
-  { name: 'カーブ',     w: 12, v: [105, 120], a: [ 6.5, -19 ], n: 2.2, color: '#9dff7f' },
-  { name: 'シュート',   w: 12, v: [138, 150], a: [-10,  -5.5], n: 2.6, color: '#ffb36b' },
-  { name: 'フォーク',   w: 14, v: [132, 145], a: [-1.0, -15 ], n: 3.0, color: '#ff7fb6' },
-  { name: 'スローボール', w: 8, v: [ 85, 100], a: [ 0.5, -6.5], n: 2.0, color: '#d8b4ff' },
+  { id: 'fastball',   w: 34, v: [148, 163], a: [-1.2, -1.6], n: 2.0, color: '#ffffff' },
+  { id: 'slider',     w: 16, v: [128, 140], a: [ 9.5, -7.5], n: 2.6, color: '#7fe3ff' },
+  { id: 'curve',      w: 12, v: [105, 120], a: [ 6.5, -19 ], n: 2.2, color: '#9dff7f' },
+  { id: 'shuuto',     w: 12, v: [138, 150], a: [-10,  -5.5], n: 2.6, color: '#ffb36b' },
+  { id: 'fork',       w: 14, v: [132, 145], a: [-1.0, -15 ], n: 3.0, color: '#ff7fb6' },
+  { id: 'slow', w: 8, v: [ 85, 100], a: [ 0.5, -6.5], n: 2.0, color: '#d8b4ff' },
 ];
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -179,6 +184,130 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = t => t * t * (3 - 2 * t);
 const DEG = Math.PI / 180;
+
+// ============================================================
+//  多言語対応（日本語・英語）。端末の言語が日本語以外なら英語で始める
+// ============================================================
+const I18N = {
+  ja: {
+    'doc.title': 'ホームラン競争 体感160km/h',
+    'title.name': 'ホームラン競争', 'title.sub': '― 体感160km/h ―',
+    'title.lead': 'ピッチャーが <b>100球</b> 投げてきます。ボールがホームベースを通過する<b>位置</b>を、<b>ちょうど良いタイミング</b>でタップして打ち返せ！',
+    'title.rule1': '球種：ストレート／スライダー／カーブ／シュート／フォーク／スローボール',
+    'title.rule2': '全球かならずストライクゾーンを通過します',
+    'title.rule3': 'タップが早い→引っ張り、遅い→流し打ち。ボールの少し下を叩くと打球が上がります',
+    'lv.legend': '体感160km/h', 'lv.pro': 'プロ', 'lv.rookie': 'ルーキー',
+    'lv.legend.btn': '体感160km/h<small>実速。最速163km/h・判定シビア（推奨）</small>',
+    'lv.pro.btn': 'プロ<small>少し遅め・判定やや甘め</small>',
+    'lv.rookie.btn': 'ルーキー<small>練習用。かなり遅め</small>',
+    'calib.title': 'タイミング補正', 'calib.auto': '自動調整',
+    'calib.note': 'スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ',
+    'vib.btn': '📳 振動テスト', 'vib.note': 'スマホが振動するか確認できます',
+    'vib.unsupported': 'このブラウザは振動APIに非対応（iPhoneは iOS 18 以降のみ軽い触覚で代用）',
+    'vib.ok': '振動命令は成功。震えない場合は端末の「バイブレーションと触覚フィードバック」設定を確認してください',
+    'vib.framed': 'ブラウザにブロックされました（アプリ内のプレビュー表示では振動できません。Chrome で直接開いてください）',
+    'vib.blocked': 'ブラウザにブロックされました（Chrome で直接開いているか確認してください）',
+    'legal.privacy': 'プライバシーポリシー', 'legal.privacyUrl': 'https://techgym.jp/privacy-policy/', 'legal.ads': '広告の設定',
+    'hud.pitch': '投球', 'hud.hr': 'ホームラン', 'hud.hits': '安打', 'hud.avg': '打率', 'hud.pitching': '投球中',
+    'pitch.fastball': 'ストレート', 'pitch.slider': 'スライダー', 'pitch.curve': 'カーブ',
+    'pitch.shuuto': 'シュート', 'pitch.fork': 'フォーク', 'pitch.slow': 'スローボール',
+    'judge.just': 'ジャスト！', 'judge.early': '早い {ms}ms', 'judge.late': '遅い {ms}ms',
+    'miss.title': '空振り', 'miss.notYet': 'まだ投げてない！', 'miss.tooEarly': '早すぎ', 'miss.tooLate': '振り遅れ',
+    'miss.over': 'ボールの上を空振り', 'miss.under': 'ボールの下を空振り', 'miss.outside': 'コースが外側にズレた', 'miss.inside': 'コースが内側にズレた',
+    'look.title': '見逃しストライク', 'look.sub': '全球ストライクだ！',
+    'res.foul': 'ファウル', 'res.wall': 'フェンス直撃！', 'res.double': 'ツーベース', 'res.hit': 'ヒット',
+    'res.hardGrounder': '強烈なゴロが内野を抜けた', 'res.grounder': 'ゴロ', 'res.out': 'アウト', 'res.popup': 'ポップフライ',
+    'res.liner': 'ライナー', 'res.bloop': 'ポテンヒット', 'res.close': '惜しい！', 'res.warningTrack': 'フェンス手前で外野フライ', 'res.flyout': '外野フライ',
+    'hr.distance': '飛距離 {m}m', 'hr.count': '第{n}号',
+    'hint.tap': 'ボールの来る位置をタップ！', 'hint.next': 'タップで次の球へ',
+    'end.title': '試合終了', 'end.avg': '打率', 'end.avgDetail': '（{h}安打 / {ab}打数）', 'end.hr': 'ホームラン',
+    'end.hits': '安打（本塁打含む）', 'end.long': '最長飛距離', 'end.just': 'ジャストミート',
+    'end.again': 'もう一度', 'end.toTitle': '難易度を選ぶ', 'end.rank': '{level}：{rank}', 'end.extended': '（延長戦込み）',
+    'rank.legend': '伝説のスラッガー', 'rank.king': 'ホームラン王', 'rank.cleanup': '4番バッター',
+    'rank.highschool': '高校球児', 'rank.sandlot': '草野球の星', 'rank.practice': '修行が必要…',
+    'extra.btn': '🎬 広告を見て延長戦', 'extra.note': 'あと{n}球打てます（1試合1回）', 'extra.loading': '広告を読み込み中…',
+    'extra.skipped': '最後まで見ると延長戦になります', 'extra.fail': '広告を読み込めませんでした。少し待ってもう一度お試しください',
+    'extra.start': '延長戦！', 'extra.startSub': 'あと{n}球',
+    'share.btn': '📤 結果をシェア', 'share.x': '𝕏 ポスト', 'share.copy': 'コピー',
+    'share.noteNative': 'X・LINE などのアプリを選んでシェア', 'share.noteImage': '成績画像つきでシェアできます', 'share.noteLinks': 'X・LINE・コピーからシェアしてください',
+    'share.copied': '結果をコピーしました！SNSに貼り付けてください', 'share.copyFail': 'コピーできませんでした。X・LINEボタンを使ってください',
+    'share.title': 'ホームラン競争', 'share.dialog': '結果をシェア',
+    'share.text': '⚾ホームラン競争【{level}】で{hr}本塁打！{ext}\n打率{avg}（{hits}安打/{ab}打数）・最長{long}m\n称号：{rank}\n#ホームラン競争 #体感160km',
+    'card.head': 'ホームラン競争【{level}】', 'card.hr': '{hr}本塁打', 'card.rank': '称号：{rank}{ext}',
+    'card.avg': '打率 {avg}（{hits}安打 / {ab}打数）', 'card.long': '最長飛距離 {long}m', 'card.tags': '#ホームラン競争  #体感160km',
+    'pause.title': '一時停止中', 'pause.resume': '▶ 再開', 'sep': '　',
+  },
+  en: {
+    'doc.title': 'Homerun Challenge 160km/h',
+    'title.name': 'HOMERUN CHALLENGE', 'title.sub': '― 160km/h ―',
+    'title.lead': 'The pitcher throws <b>100 pitches</b>. Tap the <b>spot</b> where the ball crosses home plate at <b>just the right moment</b> to hit it!',
+    'title.rule1': 'Pitches: fastball / slider / curveball / shuuto / forkball / slow ball',
+    'title.rule2': 'Every pitch crosses the strike zone',
+    'title.rule3': 'Tap early to pull, late to go the other way. Hit just under the ball to lift it',
+    'lv.legend': '160km/h', 'lv.pro': 'Pro', 'lv.rookie': 'Rookie',
+    'lv.legend.btn': '160km/h<small>Real speed. Up to 163km/h, strict timing (recommended)</small>',
+    'lv.pro.btn': 'Pro<small>A bit slower, a bit more forgiving</small>',
+    'lv.rookie.btn': 'Rookie<small>Practice. Much slower</small>',
+    'calib.title': 'Timing calibration', 'calib.auto': 'Auto',
+    'calib.note': 'Subtracts your phone\'s display and touch delay from your swing timing. If you keep seeing "LATE", go +',
+    'vib.btn': '📳 Vibration test', 'vib.note': 'Check whether your phone vibrates',
+    'vib.unsupported': 'This browser doesn\'t support vibration (on iPhone, iOS 18+ uses a light haptic instead)',
+    'vib.ok': 'Vibration sent. If nothing happens, check your phone\'s "Vibration & haptics" settings',
+    'vib.framed': 'Blocked by the browser (vibration doesn\'t work in in-app previews; open it directly in Chrome)',
+    'vib.blocked': 'Blocked by the browser (make sure you opened it directly in Chrome)',
+    'legal.privacy': 'Privacy Policy', 'legal.privacyUrl': 'https://techgym.jp/privacy-policy-en/', 'legal.ads': 'Ad settings',
+    'hud.pitch': 'PITCH', 'hud.hr': 'HOME RUNS', 'hud.hits': 'HITS', 'hud.avg': 'AVG', 'hud.pitching': 'PITCHING',
+    'pitch.fastball': 'Fastball', 'pitch.slider': 'Slider', 'pitch.curve': 'Curveball',
+    'pitch.shuuto': 'Shuuto', 'pitch.fork': 'Forkball', 'pitch.slow': 'Slow ball',
+    'judge.just': 'PERFECT!', 'judge.early': 'EARLY {ms}ms', 'judge.late': 'LATE {ms}ms',
+    'miss.title': 'SWING AND A MISS', 'miss.notYet': 'He hasn\'t thrown it yet!', 'miss.tooEarly': 'Way too early', 'miss.tooLate': 'Way too late',
+    'miss.over': 'Swung over it', 'miss.under': 'Swung under it', 'miss.outside': 'Missed outside', 'miss.inside': 'Missed inside',
+    'look.title': 'CALLED STRIKE', 'look.sub': 'Every pitch is a strike!',
+    'res.foul': 'FOUL BALL', 'res.wall': 'OFF THE WALL!', 'res.double': 'Double', 'res.hit': 'BASE HIT',
+    'res.hardGrounder': 'A hard grounder through the infield', 'res.grounder': 'GROUNDER', 'res.out': 'Out', 'res.popup': 'POP FLY',
+    'res.liner': 'LINE DRIVE', 'res.bloop': 'BLOOP HIT', 'res.close': 'SO CLOSE!', 'res.warningTrack': 'Caught on the warning track', 'res.flyout': 'FLY OUT',
+    'hr.distance': 'DISTANCE {m}m', 'hr.count': 'HR #{n}',
+    'hint.tap': 'Tap where the ball will cross!', 'hint.next': 'Tap for the next pitch',
+    'end.title': 'GAME SET', 'end.avg': 'AVG', 'end.avgDetail': ' ({h} H / {ab} AB)', 'end.hr': 'Home runs',
+    'end.hits': 'Hits (incl. HR)', 'end.long': 'Longest drive', 'end.just': 'Perfect contact',
+    'end.again': 'Play again', 'end.toTitle': 'Choose level', 'end.rank': '{level}: {rank}', 'end.extended': ' (incl. extra innings)',
+    'rank.legend': 'Legendary Slugger', 'rank.king': 'Home Run King', 'rank.cleanup': 'Cleanup Hitter',
+    'rank.highschool': 'High School Star', 'rank.sandlot': 'Sandlot Star', 'rank.practice': 'Keep Practicing…',
+    'extra.btn': '🎬 Watch an ad for extra innings', 'extra.note': '{n} more pitches (once per game)', 'extra.loading': 'Loading ad…',
+    'extra.skipped': 'Watch to the end to play extra innings', 'extra.fail': 'Couldn\'t load an ad. Please wait a moment and try again',
+    'extra.start': 'EXTRA INNINGS!', 'extra.startSub': '{n} more pitches',
+    'share.btn': '📤 Share result', 'share.x': '𝕏 Post', 'share.copy': 'Copy',
+    'share.noteNative': 'Pick X, LINE or any app to share', 'share.noteImage': 'Share with your score card image', 'share.noteLinks': 'Share via X, LINE or copy',
+    'share.copied': 'Copied! Paste it into your favorite app', 'share.copyFail': 'Couldn\'t copy. Please use the X or LINE button',
+    'share.title': 'Homerun Challenge', 'share.dialog': 'Share result',
+    'share.text': '⚾ I hit {hr} home runs in Homerun Challenge [{level}]!{ext}\nAVG {avg} ({hits} H / {ab} AB), longest {long}m\nTitle: {rank}\n#HomerunChallenge #160kmh',
+    'card.head': 'Homerun Challenge [{level}]', 'card.hr': '{hr} HOME RUNS', 'card.rank': 'Title: {rank}{ext}',
+    'card.avg': 'AVG {avg} ({hits} H / {ab} AB)', 'card.long': 'Longest drive {long}m', 'card.tags': '#HomerunChallenge  #160kmh',
+    'pause.title': 'PAUSED', 'pause.resume': '▶ Resume', 'sep': '  ',
+  },
+};
+let lang = 'ja';
+try { lang = localStorage.getItem('homerun.lang') || ''; } catch (e) {}
+if (!I18N[lang]) lang = /^ja\b/i.test(navigator.language || '') ? 'ja' : 'en';
+function t(key, vars) {
+  let str = (I18N[lang] && I18N[lang][key]) ?? I18N.ja[key] ?? key;
+  if (vars) str = str.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? ''));
+  return str;
+}
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.title = t('doc.title');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === lang));
+  const pl = document.getElementById('privacyLink'); if (pl) pl.href = t('legal.privacyUrl');
+}
+function setLang(l) {
+  if (!I18N[l]) return;
+  lang = l;
+  try { localStorage.setItem('homerun.lang', l); } catch (e) {}
+  applyLang();
+}
 
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -545,14 +674,13 @@ const hapticSwitch = (() => {
 })();
 function vibrateTest() {
   const out = document.getElementById('vibResult');
-  if (!navigator.vibrate) { hapticSwitch.click(); out.textContent = 'このブラウザは振動APIに非対応（iPhoneは iOS 18 以降のみ軽い触覚で代用）'; return; }
+  if (!navigator.vibrate) { hapticSwitch.click(); out.textContent = t('vib.unsupported'); return; }
   let ok = false;
   try { ok = navigator.vibrate([200, 100, 200]); } catch (e) {}
   const framed = window.self !== window.top;
   out.textContent = ok
-    ? '振動命令は成功。震えない場合は端末の「バイブレーションと触覚フィードバック」設定を確認してください'
-    : (framed ? 'ブラウザにブロックされました（アプリ内のプレビュー表示では振動できません。Chrome で直接開いてください）'
-              : 'ブラウザにブロックされました（Chrome で直接開いているか確認してください）');
+    ? t('vib.ok')
+    : t(framed ? 'vib.framed' : 'vib.blocked');
 }
 // 打撃判定は指が触れた瞬間(pointerdown)に行うが、Chrome はタッチの pointerdown を
 // ユーザー操作として扱わず振動を無視することがあるため、指を離した瞬間にも鳴らし直す
@@ -669,14 +797,14 @@ function beginWindup() {
   windup = { hold: quick ? rand(0.1, 0.25) : rand(0.35, 1.3), kick: quick ? 0.42 : rand(0.6, 0.78) };
   state = 'windup'; stateT = now;
   marks = null; msg = null;
-  setHudPitch('投球中', '― km/h', '#b9c6e8');
+  setHudPitch(t('hud.pitching'), '― km/h', '#b9c6e8');
 }
 
 function releasePitch() {
   const type = choosePitch();
   // 後半ほどストレートが速くなる
   let kmh = rand(type.v[0], type.v[1]);
-  if (type.name === 'ストレート') kmh = Math.min(type.v[1], kmh + Math.min(1, pitchNo / TOTAL_PITCHES) * 4);
+  if (type.id === 'fastball') kmh = Math.min(type.v[1], kmh + Math.min(1, pitchNo / TOTAL_PITCHES) * 4);
   kmh = Math.round(kmh);
   const v = kmh / 3.6 * level.speedMul;
   const T = (REL.z / v) * 1.05; // 空気抵抗でわずかに減速
@@ -732,14 +860,14 @@ function plateFromScreen(sx, sy) {
   return { x: CAM0.x + (sx - CX) * D / F0, y: CAM0.y - (sy - CY) * D / F0 };
 }
 
-function doSwing(sx, sy, t) {
+function doSwing(sx, sy, tapTime) {
   sfx.swing();
-  swing = { sx, sy, t };
+  swing = { sx, sy, t: tapTime };
   if (state === 'windup' || !pitch) {
-    swing.miss = true; swing.reason = 'まだ投げてない！';
+    swing.miss = true; swing.reason = t('miss.notYet');
     return;
   }
-  const rawDt = t - pitch.tArr;
+  const rawDt = tapTime - pitch.tArr;
   learnLatency(rawDt);
   const dt = rawDt - calib.ms;                     // +:遅い  -:早い（端末の遅延を補正済み）
   const tap = plateFromScreen(sx, sy);
@@ -748,9 +876,9 @@ function doSwing(sx, sy, t) {
   swing.dt = dt; swing.ex = ex; swing.ey = ey;
   if (Math.abs(nt) > 1.6 || ns > 1) {
     swing.miss = true;
-    if (Math.abs(nt) > 1.6) swing.reason = dt < 0 ? '早すぎ' : '振り遅れ';
-    else if (Math.abs(ey) >= Math.abs(ex)) swing.reason = ey > 0 ? 'ボールの上を空振り' : 'ボールの下を空振り';
-    else swing.reason = ex > 0 ? 'コースが外側にズレた' : 'コースが内側にズレた';
+    if (Math.abs(nt) > 1.6) swing.reason = t(dt < 0 ? 'miss.tooEarly' : 'miss.tooLate');
+    else if (Math.abs(ey) >= Math.abs(ex)) swing.reason = t(ey > 0 ? 'miss.over' : 'miss.under');
+    else swing.reason = t(ex > 0 ? 'miss.outside' : 'miss.inside');
     return;
   }
   hitBall(nt, ns, ex, ey, dt);
@@ -804,16 +932,16 @@ function hitBall(nt, ns, ex, ey, dt) {
   path.push({ x: p.x, y: p.y, z: p.z });
 
   const phiDeg = phi / DEG, thDeg = theta / DEG, firstPhi = Math.abs(phiDeg);
-  let kind, label, sub = '';
-  if (firstPhi > 45 && !hr) { kind = 'foul'; label = 'ファウル'; }
+  let kind, label, sub = '', close = false;
+  if (firstPhi > 45 && !hr) { kind = 'foul'; label = t('res.foul'); }
   else if (hr) { kind = 'hr'; label = 'HOME RUN!!'; }
-  else if (wall) { kind = 'hit'; label = 'フェンス直撃！'; sub = 'ツーベース'; }
-  else if (thDeg < 9) { if (ev > 150 && Math.abs(phiDeg) < 38) { kind = 'hit'; label = 'ヒット'; sub = '強烈なゴロが内野を抜けた'; } else { kind = 'out'; label = 'ゴロ'; sub = 'アウト'; } }
-  else if (thDeg > 52) { kind = 'out'; label = 'ポップフライ'; sub = 'アウト'; }
-  else if (thDeg < 22 && (landR ?? 0) > 30) { kind = 'hit'; label = 'ライナー'; sub = 'ヒット'; }
-  else if ((landR ?? 0) > 40 && (landR ?? 0) < 68) { kind = 'hit'; label = 'ポテンヒット'; sub = ''; }
-  else if ((landR ?? 0) > fenceR(phi) - 12) { kind = 'out'; label = '惜しい！'; sub = 'フェンス手前で外野フライ'; }
-  else { kind = 'out'; label = '外野フライ'; sub = 'アウト'; }
+  else if (wall) { kind = 'hit'; label = t('res.wall'); sub = t('res.double'); }
+  else if (thDeg < 9) { if (ev > 150 && Math.abs(phiDeg) < 38) { kind = 'hit'; label = t('res.hit'); sub = t('res.hardGrounder'); } else { kind = 'out'; label = t('res.grounder'); sub = t('res.out'); } }
+  else if (thDeg > 52) { kind = 'out'; label = t('res.popup'); sub = t('res.out'); }
+  else if (thDeg < 22 && (landR ?? 0) > 30) { kind = 'hit'; label = t('res.liner'); sub = t('res.hit'); }
+  else if ((landR ?? 0) > 40 && (landR ?? 0) < 68) { kind = 'hit'; label = t('res.bloop'); sub = ''; }
+  else if ((landR ?? 0) > fenceR(phi) - 12) { kind = 'out'; label = t('res.close'); sub = t('res.warningTrack'); close = true; }
+  else { kind = 'out'; label = t('res.flyout'); sub = t('res.out'); }
 
   const dist = Math.round(landR ?? Math.hypot(p.x, p.z));
   batted = { path, t0: now, hr, hrIdx, kind, label, sub, dist, ev: Math.round(ev), done: false, hrFired: false, speed: 1.35 };
@@ -823,7 +951,7 @@ function hitBall(nt, ns, ex, ey, dt) {
   haptic(kind === 'foul' ? 80 : kind === 'hr' ? [180, 70, 180] : Math.round(100 + power * 80));   // 芯で捉えるほど長く、ホームランは2回
   if (kind === 'hit') { stats.hit++; }
   if (kind === 'hit') sfx.cheer(0.5, 1.4);
-  else if (label === '惜しい！') sfx.sigh(1);
+  else if (close) sfx.sigh(1);
   flashT = now;
   swing.hit = true;
   marks = { target: { ...pitch.target }, tap: { sx: swing.sx, sy: swing.sy } };
@@ -835,27 +963,27 @@ function hitBall(nt, ns, ex, ey, dt) {
 
 function timingText(dt) {
   const a = Math.round(Math.abs(dt));
-  if (a <= 15) return 'ジャスト！';
-  return (dt < 0 ? '早い ' : '遅い ') + a + 'ms';
+  if (a <= 15) return t('judge.just');
+  return t(dt < 0 ? 'judge.early' : 'judge.late', { ms: a });
 }
 
 function showPitchInfo() {
   if (!pitch) return;
-  setHudPitch(pitch.type.name, pitch.kmh + ' km/h', pitch.type.color);
+  setHudPitch(t('pitch.' + pitch.type.id), pitch.kmh + ' km/h', pitch.type.color);
 }
 
 function finishPitchNoHit() {
   // 見逃し or 空振り
   marks = { target: { ...pitch.target }, tap: swing ? { sx: swing.sx, sy: swing.sy } : null };
   if (swing) {
-    let t = '空振り';
+    const title = t('miss.title');
     sfx.sigh(1);
     const sub = swing.reason || '';
-    msg = { text: t, sub, color: '#ff6b6b', t: now };
+    msg = { text: title, sub, color: '#ff6b6b', t: now };
   } else {
-    msg = { text: '見逃しストライク', sub: '全球ストライクだ！', color: '#ffcf5a', t: now };
+    msg = { text: t('look.title'), sub: t('look.sub'), color: '#ffcf5a', t: now };
   }
-  if (swing && swing.dt !== undefined && Math.abs(swing.dt) < 300) msg.sub += (msg.sub ? '　' : '') + '(' + timingText(swing.dt) + ')';
+  if (swing && swing.dt !== undefined && Math.abs(swing.dt) < 300) msg.sub += (msg.sub ? t('sep') : '') + '(' + timingText(swing.dt) + ')';
   showPitchInfo();
   state = 'result'; stateT = now;
 }
@@ -874,19 +1002,20 @@ function endGame() {
   document.getElementById('eHr').textContent = stats.hr;
   document.getElementById('eHit').textContent = totalHits();
   document.getElementById('eAvg').textContent = formatAvg(totalHits(), stats.ab);
-  document.getElementById('eAvgDetail').textContent = `${totalHits()}安打 / ${stats.ab}打数`;
+  document.getElementById('eAvgDetail').textContent = t('end.avgDetail', { h: totalHits(), ab: stats.ab });
   document.getElementById('eLong').textContent = stats.longest + 'm';
   document.getElementById('eJust').textContent = stats.just;
   const h = stats.hr;
-  const rank = h >= 50 ? '伝説のスラッガー' : h >= 30 ? 'ホームラン王' : h >= 15 ? '4番バッター' : h >= 5 ? '高校球児' : h >= 1 ? '草野球の星' : '修行が必要…';
-  document.getElementById('eRank').textContent = level.name + '：' + rank + (extended ? '（延長戦込み）' : '');
-  lastResult = { extended, level: level.name, rank, hr: stats.hr, hits: totalHits(), ab: stats.ab, avg: formatAvg(totalHits(), stats.ab), longest: stats.longest };
+  const rankKey = h >= 50 ? 'legend' : h >= 30 ? 'king' : h >= 15 ? 'cleanup' : h >= 5 ? 'highschool' : h >= 1 ? 'sandlot' : 'practice';
+  const rank = t('rank.' + rankKey);
+  document.getElementById('eRank').textContent = t('end.rank', { level: t('lv.' + levelKey), rank }) + (extended ? t('end.extended') : '');
+  lastResult = { extended, level: t('lv.' + levelKey), rank, hr: stats.hr, hits: totalHits(), ab: stats.ab, avg: formatAvg(totalHits(), stats.ab), longest: stats.longest };
   prepareShare();
   // 延長戦（リワード広告）は Android アプリで 1 試合 1 回だけ
   const ex = document.getElementById('extraBtn');
   ex.classList.toggle('hidden', extended || !ads.rewardedAvailable);
   ex.disabled = false;
-  document.getElementById('extraMsg').textContent = `あと${EXTRA_PITCHES}球打てます（1試合1回）`;
+  document.getElementById('extraMsg').textContent = t('extra.note', { n: EXTRA_PITCHES });
   document.getElementById('end').classList.remove('hidden');
   ads.showBanner();   // 試合終了画面の下にバナー（Android アプリのみ）
 }
@@ -900,13 +1029,13 @@ const SHARE_URL = 'https://techgym.jp/column/claude-code-game-homerun/';   // �
 const shareUrl = () => SHARE_URL;
 function shareText() {
   const r = lastResult;
-  return `⚾ホームラン競争【${r.level}】で${r.hr}本塁打！${r.extended ? '（延長戦込み）' : ''}\n打率${r.avg}（${r.hits}安打/${r.ab}打数）・最長${r.longest}m\n称号：${r.rank}\n#ホームラン競争 #体感160km`;
+  return t('share.text', { level: r.level, hr: r.hr, ext: r.extended ? t('end.extended') : '', avg: r.avg, hits: r.hits, ab: r.ab, long: r.longest, rank: r.rank });
 }
 function prepareShare() {
   const text = shareText(), url = shareUrl();
   $('shareX').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + (url ? '&url=' + encodeURIComponent(url) : '');
   $('shareLine').href = 'https://line.me/R/share?text=' + encodeURIComponent(text + (url ? '\n' + url : ''));
-  $('shareMsg').textContent = NATIVE ? 'X・LINE などのアプリを選んでシェア' : navigator.share ? '成績画像つきでシェアできます' : 'X・LINE・コピーからシェアしてください';
+  $('shareMsg').textContent = t(NATIVE ? 'share.noteNative' : navigator.share ? 'share.noteImage' : 'share.noteLinks');
   // アプリでは共有メニューに X・LINE も出るので、個別のボタンは隠す
   document.querySelector('.shareRow').classList.toggle('hidden', NATIVE);
 }
@@ -927,15 +1056,17 @@ function makeShareImage() {
   g.fillStyle = '#0d4a35'; g.fillRect(0, 560, 1200, 70);
   g.textAlign = 'center'; g.textBaseline = 'middle';
   const font = (w, sz) => `${w} ${sz}px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif`;
-  g.fillStyle = '#9fd8ff'; g.font = font(800, 34); g.fillText(`ホームラン競争【${r.level}】`, 600, 70);
+  g.fillStyle = '#9fd8ff'; g.font = font(800, 34); g.fillText(t('card.head', { level: r.level }), 600, 70);
   const gold = g.createLinearGradient(0, 120, 0, 280);
   gold.addColorStop(0, '#fff6c4'); gold.addColorStop(0.5, '#ffd000'); gold.addColorStop(1, '#ff8a00');
-  g.fillStyle = gold; g.font = font(900, 150); g.fillText(`${r.hr}本塁打`, 600, 200);
-  g.fillStyle = '#ff9d3c'; g.font = font(900, 52); g.fillText(`称号：${r.rank}${r.extended ? '（延長戦込み）' : ''}`, 600, 330);
+  g.fillStyle = gold; g.font = font(900, 150); const hrText = t('card.hr', { hr: r.hr });
+  if (hrText.length > 8) g.font = font(900, 112);
+  g.fillText(hrText, 600, 200, 1100);
+  g.fillStyle = '#ff9d3c'; g.font = font(900, 52); g.fillText(t('card.rank', { rank: r.rank, ext: r.extended ? t('end.extended') : '' }), 600, 330, 1120);
   g.fillStyle = '#ffffff'; g.font = font(800, 44);
-  g.fillText(`打率 ${r.avg}（${r.hits}安打 / ${r.ab}打数）`, 600, 420);
-  g.fillText(`最長飛距離 ${r.longest}m`, 600, 490);
-  g.fillStyle = '#d9e2f5'; g.font = font(700, 28); g.fillText('#ホームラン競争  #体感160km', 600, 595);
+  g.fillText(t('card.avg', { avg: r.avg, hits: r.hits, ab: r.ab }), 600, 420);
+  g.fillText(t('card.long', { long: r.longest }), 600, 490);
+  g.fillStyle = '#d9e2f5'; g.font = font(700, 28); g.fillText(t('card.tags'), 600, 595);
   return new Promise(res => c.toBlob(res, 'image/png'));
 }
 async function shareResult() {
@@ -944,14 +1075,14 @@ async function shareResult() {
   // Android アプリでは Android の共有メニューを出す
   const nativeShare = plugin('Share');
   if (nativeShare) {
-    try { await nativeShare.share({ title: 'ホームラン競争', text, url, dialogTitle: '結果をシェア' }); } catch (e) { /* キャンセル */ }
+    try { await nativeShare.share({ title: t('share.title'), text, url, dialogTitle: t('share.dialog') }); } catch (e) { /* キャンセル */ }
     return;
   }
   if (navigator.share) {
     try {
       const blob = await makeShareImage();
       const file = blob && new File([blob], 'homerun-result.png', { type: 'image/png' });
-      const data = { title: 'ホームラン競争', text: text + (url ? '\n' + url : '') };
+      const data = { title: t('share.title'), text: text + (url ? '\n' + url : '') };
       if (file && navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
       await navigator.share(data);
       return;
@@ -971,7 +1102,7 @@ async function copyResult() {
       ta.select(); ok = document.execCommand('copy'); ta.remove();
     } catch (e) {}
   }
-  $('shareMsg').textContent = ok ? '結果をコピーしました！SNSに貼り付けてください' : 'コピーできませんでした。X・LINEボタンを使ってください';
+  $('shareMsg').textContent = t(ok ? 'share.copied' : 'share.copyFail');
 }
 
 // ============================================================
@@ -1498,14 +1629,14 @@ function drawMessages() {
       const sc = e < 0.35 ? 0.3 + 0.9 * smooth(e / 0.35) + Math.sin(e * 30) * 0.05 : 1 + Math.sin(e * 5) * 0.03;
       const a = e > 5 ? 1 - (e - 5) : 1;
       drawCenterText('HOME RUN!!', H * 0.25, base * 0.15, 'gold', a, sc);
-      drawCenterText(`飛距離 ${hrBanner.dist}m`, H * 0.25 + base * 0.13, base * 0.07, '#fff', a, 1);
-      if (hrBanner.count > 1) drawCenterText(`第${hrBanner.count}号`, H * 0.25 + base * 0.22, base * 0.05, '#ffd84a', a, 1);
+      drawCenterText(t('hr.distance', { m: hrBanner.dist }), H * 0.25 + base * 0.13, base * 0.07, '#fff', a, 1);
+      if (hrBanner.count > 1) drawCenterText(t('hr.count', { n: hrBanner.count }), H * 0.25 + base * 0.22, base * 0.05, '#ffd84a', a, 1);
     }
   }
   if (batted && batted.done && !batted.hr) {
     const e = (now - batted.doneT) / 1000;
     drawCenterText(batted.label, H * 0.25, base * 0.1, batted.kind === 'hit' ? '#7dff9a' : batted.kind === 'foul' ? '#ffcf5a' : '#ffffff', clamp(e * 4, 0, 1));
-    const sub = (batted.sub ? batted.sub + '　' : '') + (batted.kind !== 'foul' ? batted.dist + 'm' : '');
+    const sub = (batted.sub ? batted.sub + t('sep') : '') + (batted.kind !== 'foul' ? batted.dist + 'm' : '');
     if (sub) drawCenterText(sub, H * 0.25 + base * 0.09, base * 0.045, '#fff', clamp(e * 4, 0, 1));
   }
   if (msg) {
@@ -1520,11 +1651,11 @@ function drawMessages() {
     if (b) drawCenterText(`${Math.round(Math.hypot(b.x, b.z))}m`, H * 0.86, base * 0.06, '#7fe3ff', 0.9);
   }
   if (state === 'ready' && pitchNo === 0) {
-    drawCenterText('ボールの来る位置をタップ！', H * 0.72, base * 0.06, '#fff', 0.95);
+    drawCenterText(t('hint.tap'), H * 0.72, base * 0.06, '#fff', 0.95);
   }
   if (batted && (state === 'flight') && batted.done) {
     const e = (now - batted.doneT) / 1000;
-    if (e > 0.8) drawCenterText('タップで次の球へ', H * 0.9, base * 0.04, 'rgba(255,255,255,0.8)', 0.6 + Math.sin(now / 200) * 0.3);
+    if (e > 0.8) drawCenterText(t('hint.next'), H * 0.9, base * 0.04, 'rgba(255,255,255,0.8)', 0.6 + Math.sin(now / 200) * 0.3);
   }
 }
 
@@ -1648,6 +1779,8 @@ function render(time) {
 // ============================================================
 //  画面遷移
 // ============================================================
+document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
+applyLang();
 document.querySelectorAll('[data-level]').forEach(btn => btn.addEventListener('click', () => { initAudio(); startGame(btn.dataset.level); }));
 document.getElementById('vibTest').addEventListener('click', vibrateTest);
 document.getElementById('latMinus').addEventListener('click', () => nudgeCalib(-10));
@@ -1662,7 +1795,7 @@ document.getElementById('extraBtn').addEventListener('click', async () => {
   if (extraBusy || extended || state !== 'end') return;
   extraBusy = true;
   const btn = document.getElementById('extraBtn'), note = document.getElementById('extraMsg');
-  btn.disabled = true; note.textContent = '広告を読み込み中…';
+  btn.disabled = true; note.textContent = t('extra.loading');
   ads.hideBanner();
   const result = await ads.showRewarded();
   extraBusy = false;
@@ -1670,7 +1803,7 @@ document.getElementById('extraBtn').addEventListener('click', async () => {
   if (result !== 'rewarded') {
     ads.showBanner();
     btn.disabled = false;
-    note.textContent = result === 'skipped' ? '最後まで見ると延長戦になります' : '広告を読み込めませんでした。少し待ってもう一度お試しください';
+    note.textContent = t(result === 'skipped' ? 'extra.skipped' : 'extra.fail');
     return;
   }
   extended = true; totalPitches = TOTAL_PITCHES + EXTRA_PITCHES;
@@ -1678,7 +1811,7 @@ document.getElementById('extraBtn').addEventListener('click', async () => {
   document.getElementById('end').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   updateHud();
-  msg = { text: '延長戦！', sub: `あと${EXTRA_PITCHES}球`, color: '#7dff9a', t: now };
+  msg = { text: t('extra.start'), sub: t('extra.startSub', { n: EXTRA_PITCHES }), color: '#7dff9a', t: now };
   toReady(1500);
   bandStart();
 });
