@@ -33,3 +33,7 @@
 ## Android 版
 
 Capacitor で Android アプリにしています（パッケージ名 `jp.techgym.homerun`）。ビルドは GitHub Actions で行い、動作確認用 APK は Release `android-latest` からダウンロードできます。Google Play 公開までの手順は [docs/ANDROID.md](docs/ANDROID.md) を参照してください。
+
+## iOS 版
+
+同じ Capacitor のプロジェクトで iOS アプリにしています（Bundle ID `jp.techgym.homerun`、iPhone 縦画面）。GitHub Actions が push のたびにビルドを確認し、Secrets が登録されていれば TestFlight にアップロードします。手順は [docs/IOS_BUILD.md](docs/IOS_BUILD.md) を参照してください。

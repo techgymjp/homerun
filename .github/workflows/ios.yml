@@ -1,0 +1,122 @@
+name: iOS build
+
+# 1. push のたびに、iOS 版が Xcode でビルドできるかを確認する（署名なし・シミュレーター向け・テスト広告）
+# 2. Secrets（証明書と App Store Connect の API キー）が登録されていれば、既定ブランチでは
+#    本番広告の設定で Archive し、ビルド番号を自動で上げて App Store Connect（TestFlight）にアップロードする
+#    審査への提出は App Store Connect で行う（docs/IOS_BUILD.md）
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'js/**'
+      - 'ios/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.IOS_DIST_CERT_P12_BASE64 != '' && secrets.ASC_KEY_P8_BASE64 != '' }}
+      IS_DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: npm ci
+
+      - name: Set version name
+        run: echo "VERSION_NAME=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Copy web assets into the iOS project
+        run: |
+          npm run build
+          npx cap sync ios
+
+      # bash は pipefail で動くので、xcodebuild が失敗すればこのステップも失敗する
+      - name: Build for the simulator (no signing)
+        working-directory: ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -40
+
+      # ---- ここから下は、Secrets が登録されていて既定ブランチのときだけ（TestFlight へのアップロード）
+      - name: Switch ads to production for the App Store build
+        if: env.HAS_SIGNING == 'true' && env.IS_DEFAULT_BRANCH == 'true'
+        run: |
+          ADMOB_MODE=production npm run build
+          npx cap sync ios
+
+      - name: Install signing certificate and API key
+        if: env.HAS_SIGNING == 'true' && env.IS_DEFAULT_BRANCH == 'true'
+        env:
+          CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/dist.p12"
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Archive and upload to App Store Connect (TestFlight)
+        if: env.HAS_SIGNING == 'true' && env.IS_DEFAULT_BRANCH == 'true'
+        working-directory: ios/App
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>GNM3VTX9YG</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $ASC_KEY_PATH -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CURRENT_PROJECT_VERSION="$VERSION_CODE" MARKETING_VERSION="$VERSION_NAME" \
+            $AUTH archive | tail -40
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            $AUTH | tail -40
+          echo "Uploaded v${VERSION_NAME} (build ${VERSION_CODE}) to App Store Connect"
+
+      - name: Clean up signing files
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP/dist.p12"
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true

@@ -204,6 +204,7 @@ const I18N = {
     'calib.note': 'スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ',
     'vib.btn': '📳 振動テスト', 'vib.note': 'スマホが振動するか確認できます',
     'vib.unsupported': 'このブラウザは振動APIに非対応（iPhoneは iOS 18 以降のみ軽い触覚で代用）',
+    'vib.native': '振動させました（iPhone の「設定」→「サウンドと触覚」→「システムの触覚」がオフだと震えません）',
     'vib.ok': '振動命令は成功。震えない場合は端末の「バイブレーションと触覚フィードバック」設定を確認してください',
     'vib.framed': 'ブラウザにブロックされました（アプリ内のプレビュー表示では振動できません。Chrome で直接開いてください）',
     'vib.blocked': 'ブラウザにブロックされました（Chrome で直接開いているか確認してください）',
@@ -252,6 +253,7 @@ const I18N = {
     'calib.note': 'Subtracts your phone\'s display and touch delay from your swing timing. If you keep seeing "LATE", go +',
     'vib.btn': '📳 Vibration test', 'vib.note': 'Check whether your phone vibrates',
     'vib.unsupported': 'This browser doesn\'t support vibration (on iPhone, iOS 18+ uses a light haptic instead)',
+    'vib.native': 'Vibration sent (it won\'t work if "System Haptics" is off in Settings → Sounds & Haptics)',
     'vib.ok': 'Vibration sent. If nothing happens, check your phone\'s "Vibration & haptics" settings',
     'vib.framed': 'Blocked by the browser (vibration doesn\'t work in in-app previews; open it directly in Chrome)',
     'vib.blocked': 'Blocked by the browser (make sure you opened it directly in Chrome)',
@@ -659,9 +661,18 @@ function bandUpdate() {
 
 // ============================================================
 //  振動（スマホ）
-//  Android: Vibration API。iPhone は非対応のため、iOS 18 以降の
-//  スイッチ型チェックボックスが切り替わる時の触覚フィードバックで代用する
+//  Android: Vibration API。
+//  iOS アプリ: WebView で Vibration API が使えないため、Capacitor の Haptics を使う。
+//  iPhone の Safari（Web 版）: iOS 18 以降のスイッチ型チェックボックスの触覚フィードバックで代用する
 // ============================================================
+// iOS アプリなら Haptics で振動させて true を返す（style: 'LIGHT' / 'MEDIUM' / 'HEAVY'、'hr' はホームラン）
+function nativeHaptic(style) {
+  const cap = window.Capacitor;
+  const H = cap && cap.isNativePlatform && cap.isNativePlatform() && cap.getPlatform && cap.getPlatform() === 'ios' && cap.Plugins && cap.Plugins.Haptics;
+  if (!H) return false;
+  try { Promise.resolve(style === 'hr' ? H.notification({ type: 'SUCCESS' }) : H.impact({ style })).catch(() => {}); } catch (e) {}
+  return true;
+}
 const hapticSwitch = (() => {
   const label = document.createElement('label');
   label.setAttribute('aria-hidden', 'true');
@@ -674,6 +685,7 @@ const hapticSwitch = (() => {
 })();
 function vibrateTest() {
   const out = document.getElementById('vibResult');
+  if (nativeHaptic('HEAVY')) { out.textContent = t('vib.native'); return; }
   if (!navigator.vibrate) { hapticSwitch.click(); out.textContent = t('vib.unsupported'); return; }
   let ok = false;
   try { ok = navigator.vibrate([200, 100, 200]); } catch (e) {}
@@ -686,6 +698,7 @@ function vibrateTest() {
 // ユーザー操作として扱わず振動を無視することがあるため、指を離した瞬間にも鳴らし直す
 let pendingHaptic = null;
 function haptic(pattern) {
+  if (nativeHaptic(Array.isArray(pattern) || pattern >= 120 ? 'HEAVY' : 'MEDIUM')) return;
   pendingHaptic = { pattern, t: performance.now() };
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}   // iPhone は指を離した時だけ鳴らす
 }
@@ -1709,7 +1722,7 @@ function update(dt) {
       hrBanner = { t: now, dist: b.dist, count: stats.hr };
       launchFireworks(10);
       sfx.cheer(1, 4.5);
-      if (navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (e) {}   // ホームラン（Android のみ）
+      if (!nativeHaptic('hr') && navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (e) {}   // ホームラン（Android・iOS アプリ）
       updateHud();
     }
     if (!b.done && idx >= b.path.length - 1) {
