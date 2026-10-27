@@ -6,7 +6,7 @@
 - Bundle ID：`jp.techgym.homerun`（Android と同じ）
 - チーム：Team ID `GNM3VTX9YG`（Xcode の設定に入れてあります）。Apple Developer には**個人で登録**しています（App Store の販売元は個人名になります）
 - 対応端末：iPhone（縦画面固定）。iPad では iPhone 用の画面で動きます
-- 広告：AdMob（iOS 用のアプリと広告ユニット。アプリ ID・インタースティシャル・バナーは設定済み。**リワードは未設定**：広告ユニットを作って ID を Claude Code に渡す。空の種類は App Store 版で出さない）。起動時に「トラッキングの許可」の確認画面が出ます
+- 広告：AdMob（iOS 用のアプリと広告ユニット。アプリ ID・インタースティシャル・リワード・バナーすべて設定済み）。起動時に「トラッキングの許可」の確認画面が出ます
 - 振動：iOS アプリでは Capacitor の Haptics で振動させます（打った瞬間・ホームラン）
 
 ---

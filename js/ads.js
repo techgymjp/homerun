@@ -22,11 +22,9 @@ const Ads = (() => {
         rewarded: 'ca-app-pub-3940256099942544/1712485313',
         banner: 'ca-app-pub-3940256099942544/2435281174',
       },
-      // TODO: リワードの広告ユニットを作ったら ID を入れる。
-      // 空の種類は App Store 版（本番モード）で出さない（リワードが空なら延長戦ボタンを出さない）
       production: {
         interstitial: 'ca-app-pub-6411535997477460/4330606095',
-        rewarded: '',
+        rewarded: 'ca-app-pub-6411535997477460/2516715565',
         banner: 'ca-app-pub-6411535997477460/6647532265',
       },
     },
