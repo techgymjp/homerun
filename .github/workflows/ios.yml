@@ -21,6 +21,12 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+# shell を明示すると bash が -eo pipefail で動き、「xcodebuild … | tail」の xcodebuild の失敗も拾える
+# （指定しないと macOS では pipefail なしになり、失敗しても成功扱いになっていた）
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: macos-latest
@@ -49,7 +55,6 @@ jobs:
           npm run build
           npx cap sync ios
 
-      # bash は pipefail で動くので、xcodebuild が失敗すればこのステップも失敗する
       - name: Build for the simulator (no signing)
         working-directory: ios/App
         run: |
