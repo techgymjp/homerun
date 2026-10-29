@@ -65,6 +65,7 @@
   .legal #buildInfo { margin-right: 8px; }
   #pause { z-index: 20; }
   #pause .panel { margin-top: 30vh; }
+  .storeBtn { text-decoration: none; font-size: 15px; padding: 10px; }
   .langRow { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
   .langRow .sbtn { font-size: 13px; padding: 5px 12px; opacity: .55; }
   .langRow .sbtn.on { opacity: 1; }
@@ -104,6 +105,7 @@
       <small data-i18n="calib.note">スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ</small>
     </div>
     <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px"><span data-i18n="vib.btn">📳 振動テスト</span><small id="vibResult" data-i18n="vib.note">スマホが振動するか確認できます</small></button>
+    <a class="btn alt storeBtn hidden" id="playLink" href="https://play.google.com/store/apps/details?id=jp.techgym.homerun" target="_blank" rel="noopener"><span data-i18n="store.play">▶ Android アプリ版（Google Play）</span><small data-i18n="store.playNote">アプリ版は振動・全画面でより快適に遊べます</small></a>
     <p class="legal">
       <span id="buildInfo"></span>
       <a href="https://techgym.jp/privacy-policy/" id="privacyLink" target="_blank" rel="noopener" data-i18n="legal.privacy">プライバシーポリシー</a>
@@ -237,6 +239,7 @@ const I18N = {
     'card.head': 'ホームラン競争【{level}】', 'card.hr': '{hr}本塁打', 'card.rank': '称号：{rank}{ext}',
     'card.avg': '打率 {avg}（{hits}安打 / {ab}打数）', 'card.long': '最長飛距離 {long}m', 'card.tags': '#ホームラン競争  #体感160km',
     'pause.title': '一時停止中', 'pause.resume': '▶ 再開', 'sep': '　',
+    'store.play': '▶ Android アプリ版（Google Play）', 'store.playNote': 'アプリ版は振動・全画面でより快適に遊べます',
   },
   en: {
     'doc.title': 'Homerun Challenge 160km/h',
@@ -286,6 +289,7 @@ const I18N = {
     'card.head': 'Homerun Challenge [{level}]', 'card.hr': '{hr} HOME RUNS', 'card.rank': 'Title: {rank}{ext}',
     'card.avg': 'AVG {avg} ({hits} H / {ab} AB)', 'card.long': 'Longest drive {long}m', 'card.tags': '#HomerunChallenge  #160kmh',
     'pause.title': 'PAUSED', 'pause.resume': '▶ Resume', 'sep': '  ',
+    'store.play': '▶ Get the Android app (Google Play)', 'store.playNote': 'Full screen with vibration for the best experience',
   },
 };
 let lang = 'ja';
@@ -1158,6 +1162,9 @@ if (plugin('App')) {
     else setPaused(!paused);
   });
 }
+// Web 版のタイトル画面に Google Play へのリンクを出す（アプリ内と iPhone / iPad のブラウザでは出さない）
+const IS_IOS_BROWSER = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+document.getElementById('playLink').classList.toggle('hidden', NATIVE || IS_IOS_BROWSER);
 // どのビルドが入っているか分かるよう、アプリ版はタイトル画面にバージョンを出す
 if (window.APP_VERSION && window.APP_VERSION !== 'dev') document.getElementById('buildInfo').textContent = window.APP_VERSION;
 // EU など同意が必要な地域では、タイトル画面から広告の同意内容を変更できるようにする
