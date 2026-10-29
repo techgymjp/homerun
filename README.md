@@ -32,6 +32,8 @@
 
 ## Android 版
 
+Google Play で公開中：https://play.google.com/store/apps/details?id=jp.techgym.homerun
+
 Capacitor で Android アプリにしています（パッケージ名 `jp.techgym.homerun`）。ビルドは GitHub Actions で行い、動作確認用 APK は Release `android-latest` からダウンロードできます。Google Play 公開までの手順は [docs/ANDROID.md](docs/ANDROID.md) を参照してください。
 
 ## iOS 版

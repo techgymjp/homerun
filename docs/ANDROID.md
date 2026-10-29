@@ -36,6 +36,7 @@
 ## 進み具合
 
 - 2026-10-23：build 8（英語対応込み）と日英のストア掲載情報で、Google Play の審査に提出
+- 2026-10-29：Google Play で公開 https://play.google.com/store/apps/details?id=jp.techgym.homerun
 - 公開後にやること：AdMob でアプリを Google Play のストア掲載にリンクする（アプリの設定 → アプリストアの詳細）
 
 ## 手元でビルドする場合
