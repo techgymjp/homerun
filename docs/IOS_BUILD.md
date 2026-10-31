@@ -161,6 +161,7 @@ base64 -i AuthKey_XXXXXXXXXX.p8 | tr -d '\n' | pbcopy
 
 | 症状 | 対処 |
 | --- | --- |
+| GitHub Actions で「Your account has reached the maximum number of certificates」 | Archive を自動署名にしていたため、CI のたびに開発用証明書（Created via API）が作られて上限に達した。ワークフローは Archive を署名なしにし、書き出し時に配布用証明書で署名するよう修正済み。Apple Developer の Certificates で不要な Development 証明書を削除する（Distribution と Distribution Managed は残す） |
 | アップロードで「同じビルド番号がすでにある」 | General の Build の番号を上げてから Archive し直す |
 | Signing でエラー（チームが選べない、証明書がない） | Xcode の Accounts で Apple ID にサインインし直し、Team に TECH GYM を選ぶ。「Automatically manage signing」をオンにする |
 | 実行先に iPhone が出ない | ケーブルをつなぎ直し、iPhone で「信頼」を許可。デベロッパモードをオンにする |
