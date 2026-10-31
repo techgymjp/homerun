@@ -446,8 +446,15 @@ let AC = null, master = null, noiseBuf = null, crowdGain = null, bandBus = null,
 function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
-    AC = new (window.AudioContext || window.webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = 0.9; master.connect(AC.destination);
+    // 'balanced' で再生の余裕（バッファ）を少し大きくし、性能の低い端末でも音が途切れにくくする
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    try { AC = new Ctx({ latencyHint: 'balanced' }); } catch (e) { AC = new Ctx(); }
+    // 応援・歓声・打球音が重なっても音割れしないよう、最後にリミッター（コンプレッサー）を通す
+    const limiter = AC.createDynamicsCompressor();
+    limiter.threshold.value = -6; limiter.knee.value = 6; limiter.ratio.value = 12;
+    limiter.attack.value = 0.003; limiter.release.value = 0.25;
+    limiter.connect(AC.destination);
+    master = AC.createGain(); master.gain.value = 0.9; master.connect(limiter);
     noiseBuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -512,7 +519,7 @@ const sfx = {
       s.connect(fl).connect(gn).connect(master); s.start(t0, Math.random()); s.stop(t0 + dur + 3);
     }
     // 拍手
-    const claps = Math.floor(dur * 40 * level);
+    const claps = Math.floor(dur * 20 * level);
     for (let i = 0; i < claps; i++) noiseShot({ t: rand(0.2, dur + 0.8), dur: 0.035, type: 'highpass', f: rand(1500, 3500), g: rand(0.04, 0.12) * level });
     // 指笛
     for (let i = 0; i < Math.round(4 * level); i++) {
@@ -615,7 +622,7 @@ const BAND_STEPS = (() => {
 })();
 const band = { on: false, next: 0, i: 0, level: -1 };
 
-function brass(t0, midi, dur, g) {
+function brass(t0, midi, dur, g, detunes = [-7, 7]) {
   const f = 440 * Math.pow(2, (midi - 69) / 12);
   const out = AC.createGain();
   out.gain.setValueAtTime(0.0001, t0);
@@ -627,8 +634,8 @@ function brass(t0, midi, dur, g) {
   lp.frequency.exponentialRampToValueAtTime(f * 7, t0 + 0.04);
   lp.frequency.setTargetAtTime(f * 4, t0 + 0.07, 0.1);
   lp.connect(out).connect(bandBus);
-  // 数人のトランペット（わずかにピッチと出だしがずれる）
-  for (const d of [-8, 0, 9]) {
+  // 数人のトランペット（わずかにピッチと出だしがずれる）。音の部品を減らして処理を軽くするため 2 本
+  for (const d of detunes) {
     const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
     const st = t0 + Math.random() * 0.015;
     o.detune.setValueAtTime(d - 50, st); o.detune.linearRampToValueAtTime(d, st + 0.05);
@@ -643,19 +650,22 @@ function bandDrum(t0, g) {
   noiseShot({ t: t0 - AC.currentTime, dur: 0.08, type: 'lowpass', f: 300, g: g * 0.5, dest: bandBus });
 }
 function bandClap(t0) {
-  for (let k = 0; k < 4; k++) noiseShot({ t: t0 - AC.currentTime + rand(0, 0.03), dur: 0.05, f: rand(1200, 2200), q: 0.8, g: rand(0.08, 0.14), dest: bandBus });
+  for (let k = 0; k < 2; k++) noiseShot({ t: t0 - AC.currentTime + rand(0, 0.03), dur: 0.05, f: rand(1200, 2200), q: 0.8, g: rand(0.11, 0.18), dest: bandBus });
 }
+// 描画（requestAnimationFrame）とは別のタイマーでも予約する（描画が止まりがちな端末でも途切れないように）
+setInterval(() => bandUpdate(), 100);
 function bandStart() { if (!AC) return; band.on = true; band.i = 0; band.next = AC.currentTime + 0.3; band.level = -1; }
 function bandStop() { band.on = false; if (bandBus) bandBus.gain.setTargetAtTime(0, AC.currentTime, 0.3); }
 function bandUpdate() {
-  if (!AC || !band.on) return;
+  if (!AC || !band.on || paused) return;
   // 投球中は音量を下げて「シュー」を聞きやすく。ホームラン中は歓声を主役に
   const level = state === 'pitch' ? 0.35 : (state === 'flight' && batted && batted.hr) ? 0.25 : 1;
   if (level !== band.level) { band.level = level; bandBus.gain.setTargetAtTime(0.32 * level, AC.currentTime, 0.12); }
   if (band.next < AC.currentTime) band.next = AC.currentTime + 0.05;   // タブ復帰時などの遅れを捨てる
-  while (band.next < AC.currentTime + 0.3) {
+  // 0.6 秒先まで予約しておき、画面の処理が一瞬詰まっても音符が抜けないようにする
+  while (band.next < AC.currentTime + 0.6) {
     const st = BAND_STEPS[band.i], t = band.next;
-    if (st.note) { brass(t, st.note, st.len * BAND_EIGHTH, 0.22); brass(t, st.note - 12, st.len * BAND_EIGHTH, 0.07); }
+    if (st.note) { brass(t, st.note, st.len * BAND_EIGHTH, 0.24); brass(t, st.note - 12, st.len * BAND_EIGHTH, 0.07, [0]); }
     if (st.drum) bandDrum(t, 0.55);
     if (st.clap) bandClap(t);
     band.next += BAND_EIGHTH;
@@ -1155,6 +1165,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { setPaused(true); window.gameAudio.suspend(); }
   else window.gameAudio.resume();
 });
+// 広告（動画）や着信などで音の再生が止められたまま戻らないことがあるので、1 秒ごとに見張って再開する
+setInterval(() => {
+  if (AC && AC.state !== 'running' && AC.state !== 'closed' && !document.hidden && !paused && !ads.showing) {
+    try { Promise.resolve(AC.resume()).catch(() => {}); } catch (e) {}
+  }
+}, 1000);
 // Android の戻るボタン：プレイ中はポーズ切替、タイトル・結果画面ではアプリを閉じる
 if (plugin('App')) {
   plugin('App').addListener('backButton', () => {
