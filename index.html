@@ -105,7 +105,9 @@
       <small data-i18n="calib.note">スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ</small>
     </div>
     <button class="btn alt" id="vibTest" style="font-size:14px;padding:8px"><span data-i18n="vib.btn">📳 振動テスト</span><small id="vibResult" data-i18n="vib.note">スマホが振動するか確認できます</small></button>
+    <!-- web-only: iOS アプリには同梱しない（scripts/build-web.js が APP_PLATFORM=ios で取り除く） -->
     <a class="btn alt storeBtn hidden" id="playLink" href="https://play.google.com/store/apps/details?id=jp.techgym.homerun" target="_blank" rel="noopener"><span data-i18n="store.play">▶ Android アプリ版（Google Play）</span><small data-i18n="store.playNote">アプリ版は振動・全画面でより快適に遊べます</small></a>
+    <!-- /web-only -->
     <p class="legal">
       <span id="buildInfo"></span>
       <a href="https://techgym.jp/privacy-policy/" id="privacyLink" target="_blank" rel="noopener" data-i18n="legal.privacy">プライバシーポリシー</a>
@@ -127,11 +129,13 @@
     </div>
     <button class="btn extra hidden" id="extraBtn"><span data-i18n="extra.btn">🎬 広告を見て延長戦</span><small id="extraMsg">あと10球打てます（1試合1回）</small></button>
     <button class="btn share" id="shareBtn"><span data-i18n="share.btn">📤 結果をシェア</span><small id="shareMsg">成績画像つきでシェアできます</small></button>
+    <!-- web-only: アプリでは共有メニューを使うので、iOS アプリには同梱しない -->
     <div class="shareRow">
       <a class="sbtn" id="shareX" target="_blank" rel="noopener" data-i18n="share.x">𝕏 ポスト</a>
       <a class="sbtn" id="shareLine" target="_blank" rel="noopener">LINE</a>
       <button class="sbtn" id="shareCopy" data-i18n="share.copy">コピー</button>
     </div>
+    <!-- /web-only -->
     <button class="btn" id="again" data-i18n="end.again">もう一度</button>
     <button class="btn alt" id="toTitle" data-i18n="end.toTitle">難易度を選ぶ</button>
   </div>
@@ -239,7 +243,7 @@ const I18N = {
     'card.head': 'ホームラン競争【{level}】', 'card.hr': '{hr}本塁打', 'card.rank': '称号：{rank}{ext}',
     'card.avg': '打率 {avg}（{hits}安打 / {ab}打数）', 'card.long': '最長飛距離 {long}m', 'card.tags': '#ホームラン競争  #体感160km',
     'pause.title': '一時停止中', 'pause.resume': '▶ 再開', 'sep': '　',
-    'store.play': '▶ Android アプリ版（Google Play）', 'store.playNote': 'アプリ版は振動・全画面でより快適に遊べます',
+    /* web-only */ 'store.play': '▶ Android アプリ版（Google Play）', 'store.playNote': 'アプリ版は振動・全画面でより快適に遊べます', /* /web-only */
   },
   en: {
     'doc.title': 'Homerun Challenge 160km/h',
@@ -289,7 +293,7 @@ const I18N = {
     'card.head': 'Homerun Challenge [{level}]', 'card.hr': '{hr} HOME RUNS', 'card.rank': 'Title: {rank}{ext}',
     'card.avg': 'AVG {avg} ({hits} H / {ab} AB)', 'card.long': 'Longest drive {long}m', 'card.tags': '#HomerunChallenge  #160kmh',
     'pause.title': 'PAUSED', 'pause.resume': '▶ Resume', 'sep': '  ',
-    'store.play': '▶ Get the Android app (Google Play)', 'store.playNote': 'Full screen with vibration for the best experience',
+    /* web-only */ 'store.play': '▶ Get the Android app (Google Play)', 'store.playNote': 'Full screen with vibration for the best experience', /* /web-only */
   },
 };
 let lang = 'ja';
@@ -1060,11 +1064,15 @@ function shareText() {
 }
 function prepareShare() {
   const text = shareText(), url = shareUrl();
-  $('shareX').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + (url ? '&url=' + encodeURIComponent(url) : '');
-  $('shareLine').href = 'https://line.me/R/share?text=' + encodeURIComponent(text + (url ? '\n' + url : ''));
+  /* web-only */
+  // X・LINE・コピーのボタンは Web 版だけ（iOS アプリには同梱しないので、無いときは何もしない）
+  if ($('shareX')) $('shareX').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + (url ? '&url=' + encodeURIComponent(url) : '');
+  if ($('shareLine')) $('shareLine').href = 'https://line.me/R/share?text=' + encodeURIComponent(text + (url ? '\n' + url : ''));
+  /* /web-only */
   $('shareMsg').textContent = t(NATIVE ? 'share.noteNative' : navigator.share ? 'share.noteImage' : 'share.noteLinks');
   // アプリでは共有メニューに X・LINE も出るので、個別のボタンは隠す
-  document.querySelector('.shareRow').classList.toggle('hidden', NATIVE);
+  const row = document.querySelector('.shareRow');
+  if (row) row.classList.toggle('hidden', NATIVE);
 }
 // 成績カード画像（1200x630）
 function makeShareImage() {
@@ -1178,9 +1186,12 @@ if (plugin('App')) {
     else setPaused(!paused);
   });
 }
-// Web 版のタイトル画面に Google Play へのリンクを出す（アプリ内と iPhone / iPad のブラウザでは出さない）
+/* web-only */
+// Web 版のタイトル画面に Google Play へのリンクを出す（アプリ内と iPhone / iPad のブラウザでは出さない）。
+// iOS アプリにはこのリンク自体を同梱しない（scripts/build-web.js が APP_PLATFORM=ios で取り除く）
 const IS_IOS_BROWSER = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 document.getElementById('playLink').classList.toggle('hidden', NATIVE || IS_IOS_BROWSER);
+/* /web-only */
 // どのビルドが入っているか分かるよう、アプリ版はタイトル画面にバージョンを出す
 if (window.APP_VERSION && window.APP_VERSION !== 'dev') document.getElementById('buildInfo').textContent = window.APP_VERSION;
 // EU など同意が必要な地域では、タイトル画面から広告の同意内容を変更できるようにする
@@ -1824,7 +1835,7 @@ document.getElementById('latPlus').addEventListener('click', () => nudgeCalib(10
 document.getElementById('latAuto').addEventListener('change', e => { calib.auto = e.target.checked; calib.samples = []; saveCalib(); });
 saveCalib();
 document.getElementById('shareBtn').addEventListener('click', shareResult);
-document.getElementById('shareCopy').addEventListener('click', copyResult);
+if (document.getElementById('shareCopy')) document.getElementById('shareCopy').addEventListener('click', copyResult);
 // 延長戦：リワード広告を最後まで見たら、成績を引き継いで 10 球追加で打てる
 let extraBusy = false;
 document.getElementById('extraBtn').addEventListener('click', async () => {

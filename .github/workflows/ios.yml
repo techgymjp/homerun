@@ -50,9 +50,10 @@ jobs:
       - name: Set version name
         run: echo "VERSION_NAME=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
 
+      # iOS 用に Web 版専用の部分（Google Play へのリンクなど）を取り除いてコピーする
       - name: Copy web assets into the iOS project
         run: |
-          npm run build
+          APP_PLATFORM=ios npm run build
           npx cap sync ios
 
       - name: Build for the simulator (no signing)
@@ -66,7 +67,7 @@ jobs:
       - name: Switch ads to production for the App Store build
         if: env.HAS_SIGNING == 'true' && env.IS_DEFAULT_BRANCH == 'true'
         run: |
-          ADMOB_MODE=production npm run build
+          APP_PLATFORM=ios ADMOB_MODE=production npm run build
           npx cap sync ios
 
       - name: Install signing certificate and API key

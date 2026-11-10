@@ -9,6 +9,19 @@ for (const item of ['index.html', 'js']) {
   const src = path.join(root, item);
   if (fs.existsSync(src)) fs.cpSync(src, path.join(out, item), { recursive: true });
 }
+// iOS アプリには Web 版専用の部分（Google Play へのリンクなど）を同梱しない。
+// 「隠す」のではなく取り除く（App Store の審査で、隠された機能や他のプラットフォームへの言及と見なされないように）
+const platform = process.env.APP_PLATFORM || 'web';
+if (platform === 'ios') {
+  const file = path.join(out, 'index.html');
+  let html = fs.readFileSync(file, 'utf8');
+  const before = html.length;
+  html = html.replace(/[ \t]*<!-- web-only[\s\S]*?<!-- \/web-only -->\n?/g, '');
+  html = html.replace(/[ \t]*\/\* web-only \*\/[\s\S]*?\/\* \/web-only \*\/\n?/g, '');
+  if (/play\.google\.com|web-only/.test(html)) throw new Error('web-only parts remain in the iOS build');
+  fs.writeFileSync(file, html);
+  console.log(`removed web-only parts for iOS (${before - html.length} bytes)`);
+}
 // Google Play 用のビルドでは本番の広告を使う
 const mode = process.env.ADMOB_MODE === 'production' ? 'production' : 'test';
 fs.writeFileSync(path.join(out, 'js', 'ads-config.js'), `// ビルド時に生成\nwindow.AD_MODE = '${mode}';\n`);
