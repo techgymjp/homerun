@@ -35,6 +35,10 @@
 
     <!-- Permissions -->
 
+    <!-- 縦画面固定（sensorPortrait）にすると「縦向きの画面が必須」と自動で申告され、
+         タブレットや PC 版 Google Play Games などに配信できなくなるので、必須ではないと明示する -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 打球時にスマホを振動させる（WebView の navigator.vibrate に必要） -->
     <uses-permission android:name="android.permission.VIBRATE" />
