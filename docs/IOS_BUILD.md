@@ -151,7 +151,7 @@ base64 -i AuthKey_XXXXXXXXXX.p8 | tr -d '\n' | pbcopy
 
 ### 7-4. そのあと
 
-このリポジトリには、自動アップロードのワークフロー（`.github/workflows/ios.yml`）がすでに入っています。5 つの Secrets を登録すると、既定ブランチに push するたびに、本番広告の設定でビルドし、ビルド番号（Actions の実行回数）を自動で上げて、TestFlight にアップロードします。手動で動かすときは Actions タブ →「iOS build」→「Run workflow」。審査への提出は、これまでどおり App Store Connect で行います。
+このリポジトリには、アップロードのワークフロー（`.github/workflows/ios.yml`）がすでに入っています。push のたびにビルドできるかだけを確認し、**TestFlight へのアップロードは Actions タブ →「iOS build」→「Run workflow」で手動実行したときだけ**行います（短期間に大量のビルドを送ると、App Review から不自然な挙動と見られるおそれがあるため）。アップロードでは、本番広告の設定でビルドし、ビルド番号（Actions の実行回数）を自動で上げます。審査への提出は、これまでどおり App Store Connect で行います。
 
 **アップロードの前に**、App Store Connect で Bundle ID `jp.techgym.homerun` のアプリを作っておいてください（ないとアップロードで失敗します）。
 
@@ -162,6 +162,7 @@ base64 -i AuthKey_XXXXXXXXXX.p8 | tr -d '\n' | pbcopy
 | 症状 | 対処 |
 | --- | --- |
 | 審査で「Guideline 5.6 - Developer Code of Conduct」（審査中に意図的に隠された機能がある） | Web 版用の Google Play へのリンクと X・LINE ボタンが、iOS アプリ内に「非表示」の状態で入っていたのが原因と考えられる。iOS 用のビルドでは、`index.html` の `web-only` で囲んだ部分を `scripts/build-web.js`（`APP_PLATFORM=ios`）が取り除くようにした（隠すのではなく同梱しない）。Web 版専用の機能を足すときは、必ず `web-only` で囲む |
+| 2 回目の 5.6（Web 版専用部分を取り除いた後も） | iOS アプリから、さらに次を取り除いた：Android 用の広告 ID、App Store 用ビルドのテスト用広告 ID（`js/ads.js` の `android-only` / `test-units`）、Web 版用の予備の処理（画像付きシェア・コピー・Chrome 向けの振動の案内・Safari 用の触覚の仕組み）。TestFlight への自動アップロードを手動実行に変更。App Store Connect の「価格および配信状況」で、Apple Silicon 搭載 Mac と Apple Vision Pro での配信をオフにする（iPhone 専用アプリのため）。App Review には、どの機能が隠されていると判断したのかを質問する |
 | GitHub Actions で「Your account has reached the maximum number of certificates」 | Archive を自動署名にしていたため、CI のたびに開発用証明書（Created via API）が作られて上限に達した。ワークフローは Archive を署名なしにし、書き出し時に配布用証明書で署名するよう修正済み。Apple Developer の Certificates で不要な Development 証明書を削除する（Distribution と Distribution Managed は残す） |
 | アップロードで「同じビルド番号がすでにある」 | General の Build の番号を上げてから Archive し直す |
 | Signing でエラー（チームが選べない、証明書がない） | Xcode の Accounts で Apple ID にサインインし直し、Team に TECH GYM を選ぶ。「Automatically manage signing」をオンにする |

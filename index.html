@@ -209,11 +209,13 @@ const I18N = {
     'calib.title': 'タイミング補正', 'calib.auto': '自動調整',
     'calib.note': 'スマホの表示・タッチの遅れを打撃判定から差し引きます。「遅い」ばかり出るなら＋側へ',
     'vib.btn': '📳 振動テスト', 'vib.note': 'スマホが振動するか確認できます',
-    'vib.unsupported': 'このブラウザは振動APIに非対応（iPhoneは iOS 18 以降のみ軽い触覚で代用）',
+    /* web-only */ 'vib.unsupported': 'このブラウザは振動APIに非対応（iPhoneは iOS 18 以降のみ軽い触覚で代用）', /* /web-only */
     'vib.native': '振動させました（iPhone の「設定」→「サウンドと触覚」→「システムの触覚」がオフだと震えません）',
+    /* web-only */
     'vib.ok': '振動命令は成功。震えない場合は端末の「バイブレーションと触覚フィードバック」設定を確認してください',
     'vib.framed': 'ブラウザにブロックされました（アプリ内のプレビュー表示では振動できません。Chrome で直接開いてください）',
     'vib.blocked': 'ブラウザにブロックされました（Chrome で直接開いているか確認してください）',
+    /* /web-only */
     'legal.privacy': 'プライバシーポリシー', 'legal.privacyUrl': 'https://techgym.jp/privacy-policy/', 'legal.ads': '広告の設定',
     'hud.pitch': '投球', 'hud.hr': 'ホームラン', 'hud.hits': '安打', 'hud.avg': '打率', 'hud.pitching': '投球中',
     'pitch.fastball': 'ストレート', 'pitch.slider': 'スライダー', 'pitch.curve': 'カーブ',
@@ -259,11 +261,13 @@ const I18N = {
     'calib.title': 'Timing calibration', 'calib.auto': 'Auto',
     'calib.note': 'Subtracts your phone\'s display and touch delay from your swing timing. If you keep seeing "LATE", go +',
     'vib.btn': '📳 Vibration test', 'vib.note': 'Check whether your phone vibrates',
-    'vib.unsupported': 'This browser doesn\'t support vibration (on iPhone, iOS 18+ uses a light haptic instead)',
+    /* web-only */ 'vib.unsupported': 'This browser doesn\'t support vibration (on iPhone, iOS 18+ uses a light haptic instead)', /* /web-only */
     'vib.native': 'Vibration sent (it won\'t work if "System Haptics" is off in Settings → Sounds & Haptics)',
+    /* web-only */
     'vib.ok': 'Vibration sent. If nothing happens, check your phone\'s "Vibration & haptics" settings',
     'vib.framed': 'Blocked by the browser (vibration doesn\'t work in in-app previews; open it directly in Chrome)',
     'vib.blocked': 'Blocked by the browser (make sure you opened it directly in Chrome)',
+    /* /web-only */
     'legal.privacy': 'Privacy Policy', 'legal.privacyUrl': 'https://techgym.jp/privacy-policy-en/', 'legal.ads': 'Ad settings',
     'hud.pitch': 'PITCH', 'hud.hr': 'HOME RUNS', 'hud.hits': 'HITS', 'hud.avg': 'AVG', 'hud.pitching': 'PITCHING',
     'pitch.fastball': 'Fastball', 'pitch.slider': 'Slider', 'pitch.curve': 'Curveball',
@@ -691,6 +695,8 @@ function nativeHaptic(style) {
   try { Promise.resolve(style === 'hr' ? H.notification({ type: 'SUCCESS' }) : H.impact({ style })).catch(() => {}); } catch (e) {}
   return true;
 }
+/* web-only */
+// iPhone の Safari（Web 版）で触覚フィードバックを出すための仕組み（iOS アプリには同梱しない）
 const hapticSwitch = (() => {
   const label = document.createElement('label');
   label.setAttribute('aria-hidden', 'true');
@@ -701,9 +707,11 @@ const hapticSwitch = (() => {
   document.body.appendChild(label);
   return label;
 })();
+/* /web-only */
 function vibrateTest() {
   const out = document.getElementById('vibResult');
   if (nativeHaptic('HEAVY')) { out.textContent = t('vib.native'); return; }
+  /* web-only */
   if (!navigator.vibrate) { hapticSwitch.click(); out.textContent = t('vib.unsupported'); return; }
   let ok = false;
   try { ok = navigator.vibrate([200, 100, 200]); } catch (e) {}
@@ -711,15 +719,19 @@ function vibrateTest() {
   out.textContent = ok
     ? t('vib.ok')
     : t(framed ? 'vib.framed' : 'vib.blocked');
+  /* /web-only */
 }
+function haptic(pattern) {
+  if (nativeHaptic(Array.isArray(pattern) || pattern >= 120 ? 'HEAVY' : 'MEDIUM')) return;
+  /* web-only */
+  pendingHaptic = { pattern, t: performance.now() };
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}   // iPhone は指を離した時だけ鳴らす
+  /* /web-only */
+}
+/* web-only */
 // 打撃判定は指が触れた瞬間(pointerdown)に行うが、Chrome はタッチの pointerdown を
 // ユーザー操作として扱わず振動を無視することがあるため、指を離した瞬間にも鳴らし直す
 let pendingHaptic = null;
-function haptic(pattern) {
-  if (nativeHaptic(Array.isArray(pattern) || pattern >= 120 ? 'HEAVY' : 'MEDIUM')) return;
-  pendingHaptic = { pattern, t: performance.now() };
-  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}   // iPhone は指を離した時だけ鳴らす
-}
 function flushHaptic() {
   if (!pendingHaptic) return;
   const p = pendingHaptic; pendingHaptic = null;
@@ -727,6 +739,7 @@ function flushHaptic() {
   try { if (navigator.vibrate) navigator.vibrate(p.pattern); else hapticSwitch.click(); } catch (e) {}
 }
 for (const ev of ['pointerup', 'touchend']) cv.addEventListener(ev, flushHaptic);
+/* /web-only */
 
 // ============================================================
 //  タイミング補正（端末の表示遅延・タッチ遅延の吸収）
@@ -1074,6 +1087,7 @@ function prepareShare() {
   const row = document.querySelector('.shareRow');
   if (row) row.classList.toggle('hidden', NATIVE);
 }
+/* web-only */
 // 成績カード画像（1200x630）
 function makeShareImage() {
   const r = lastResult, c = document.createElement('canvas');
@@ -1104,6 +1118,7 @@ function makeShareImage() {
   g.fillStyle = '#d9e2f5'; g.font = font(700, 28); g.fillText(t('card.tags'), 600, 595);
   return new Promise(res => c.toBlob(res, 'image/png'));
 }
+/* /web-only */
 async function shareResult() {
   if (!lastResult) return;
   const text = shareText(), url = shareUrl(), msg = $('shareMsg');
@@ -1113,6 +1128,7 @@ async function shareResult() {
     try { await nativeShare.share({ title: t('share.title'), text, url, dialogTitle: t('share.dialog') }); } catch (e) { /* キャンセル */ }
     return;
   }
+  /* web-only */
   if (navigator.share) {
     try {
       const blob = await makeShareImage();
@@ -1126,7 +1142,9 @@ async function shareResult() {
     }
   }
   copyResult();
+  /* /web-only */
 }
+/* web-only */
 async function copyResult() {
   const text = shareText() + (shareUrl() ? '\n' + shareUrl() : '');
   let ok = false;
@@ -1139,6 +1157,7 @@ async function copyResult() {
   }
   $('shareMsg').textContent = t(ok ? 'share.copied' : 'share.copyFail');
 }
+/* /web-only */
 
 // ============================================================
 //  ポーズ・Android アプリ（Capacitor）対応
@@ -1835,7 +1854,7 @@ document.getElementById('latPlus').addEventListener('click', () => nudgeCalib(10
 document.getElementById('latAuto').addEventListener('change', e => { calib.auto = e.target.checked; calib.samples = []; saveCalib(); });
 saveCalib();
 document.getElementById('shareBtn').addEventListener('click', shareResult);
-if (document.getElementById('shareCopy')) document.getElementById('shareCopy').addEventListener('click', copyResult);
+/* web-only */ if (document.getElementById('shareCopy')) document.getElementById('shareCopy').addEventListener('click', copyResult); /* /web-only */
 // 延長戦：リワード広告を最後まで見たら、成績を引き継いで 10 球追加で打てる
 let extraBusy = false;
 document.getElementById('extraBtn').addEventListener('click', async () => {

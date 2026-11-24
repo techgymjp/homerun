@@ -3,6 +3,7 @@
 const Ads = (() => {
   // AdMob では Android と iOS を別のアプリとして登録しているので、広告ユニットも OS ごとに分かれている
   const UNITS = {
+    /* android-only: iOS アプリには同梱しない */
     android: {
       // Google 公式のテスト用広告ユニット
       test: {
@@ -16,12 +17,15 @@ const Ads = (() => {
         banner: 'ca-app-pub-6411535997477460/8591058926',
       },
     },
+    /* /android-only */
     ios: {
+      /* test-units: App Store 用のビルドには同梱しない */
       test: {
         interstitial: 'ca-app-pub-3940256099942544/4411468910',
         rewarded: 'ca-app-pub-3940256099942544/1712485313',
         banner: 'ca-app-pub-3940256099942544/2435281174',
       },
+      /* /test-units */
       production: {
         interstitial: 'ca-app-pub-6411535997477460/7704867560',
         rewarded: 'ca-app-pub-6411535997477460/6200214201',
@@ -34,7 +38,8 @@ const Ads = (() => {
   const native = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
   const platform = native && cap.getPlatform && cap.getPlatform() === 'ios' ? 'ios' : 'android';
   const testing = window.AD_MODE !== 'production';
-  const ids = UNITS[platform][testing ? 'test' : 'production'];
+  // iOS アプリには Android 用（App Store 用にはテスト用も）の ID を同梱しないので、無い場合は空にして広告を出さない
+  const ids = (UNITS[platform] || UNITS.ios || {})[testing ? 'test' : 'production'] || {};
   const AdMob = native && cap.Plugins ? cap.Plugins.AdMob : null;
 
   let ready = false;           // 広告をリクエストしてよい状態（初期化と同意確認が済んだ）
